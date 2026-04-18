@@ -225,9 +225,10 @@ window.sustainabilityModule = (() => {
             const msg = JSON.parse(raw);
             if (msg.type === 'structured') {
               output.innerHTML = renderStructured(msg.focus, msg.data, name, category);
-              // Load blueprint image
+              // Load blueprint image with redesign spec for accuracy
               if (msg.focus === 'full' || msg.focus === 'blueprint') {
-                loadBlueprintImage(name, output);
+                const redesignData = msg.focus === 'blueprint' ? msg.data.redesign : msg.data.blueprint;
+                loadBlueprintImage(name, output, redesignData);
               }
             } else if (msg.type === 'text') {
               output.innerHTML = `<div class="sus-text">${esc(msg.data)}</div>`;
@@ -246,20 +247,45 @@ window.sustainabilityModule = (() => {
 
   // ── Blueprint image ───────────────────────────────────────
 
-  async function loadBlueprintImage(productName, container) {
+  async function loadBlueprintImage(productName, container, redesignData) {
     const imgSection = container.querySelector('.sus-blueprint-img-section');
     if (!imgSection) return;
 
-    imgSection.innerHTML = `<div class="sus-loading" style="padding:20px;"><div class="sus-loading-dots"><span></span><span></span><span></span></div></div>`;
+    imgSection.innerHTML = `
+      <div class="sus-section-title">🎨 New Product Concept</div>
+      <div class="sus-blueprint-generating">
+        <div class="sus-loading-dots"><span></span><span></span><span></span></div>
+        <div class="sus-loading-text">Generating sustainable product concept with FLUX AI...</div>
+      </div>
+    `;
 
     try {
-      const url = `/api/sustainability/blueprint-image?product=${encodeURIComponent(productName)}`;
-      imgSection.innerHTML = `
-        <div class="sus-blueprint-img-wrap">
-          <img src="${url}" alt="Blueprint for ${esc(productName)}" class="sus-blueprint-img" />
-          <div class="sus-blueprint-img-label">Product Blueprint Visualisation</div>
-        </div>
-      `;
+      // Build a spec string from the redesign data for a more accurate image
+      let spec = '';
+      if (redesignData) {
+        const parts = [];
+        if (redesignData.packaging?.proposed) parts.push(redesignData.packaging.proposed);
+        if (redesignData.ingredients?.proposed) parts.push(redesignData.ingredients.proposed);
+        if (redesignData.summary) parts.push(redesignData.summary);
+        spec = parts.join('. ').slice(0, 300);
+      }
+
+      const url = `/api/sustainability/blueprint-image?product=${encodeURIComponent(productName)}&spec=${encodeURIComponent(spec)}`;
+      const res = await fetch(url, { credentials: 'include' });
+
+      if (res.ok) {
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        imgSection.innerHTML = `
+          <div class="sus-section-title">🎨 New Product Concept</div>
+          <div class="sus-blueprint-img-wrap">
+            <img src="${objectUrl}" alt="Sustainable redesign of ${esc(productName)}" class="sus-blueprint-img" />
+            <div class="sus-blueprint-img-label">AI-generated sustainable product concept · FLUX.1-schnell</div>
+          </div>
+        `;
+      } else {
+        imgSection.innerHTML = '';
+      }
     } catch {
       imgSection.innerHTML = '';
     }

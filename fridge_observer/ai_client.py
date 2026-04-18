@@ -9,6 +9,8 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+ANSWER_SEP = "---ANSWER---"
+
 # Keys are loaded from environment variables (see .env.example)
 K2_API_KEY = os.environ.get("K2_API_KEY", "")
 K2_BASE_URL = "https://api.k2think.ai/v1"

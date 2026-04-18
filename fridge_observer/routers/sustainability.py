@@ -170,19 +170,22 @@ Return JSON:
 
 
 @router.get("/blueprint-image")
-async def get_blueprint_image(product: str, current_user: dict = Depends(get_current_user)):
+async def get_blueprint_image(
+    product: str,
+    spec: str = "",
+    current_user: dict = Depends(get_current_user)
+):
     """
-    Generate a product sustainability blueprint image using FLUX.1-schnell.
-    Falls back to SVG placeholder if HF token not configured.
+    Generate an accurate new sustainable product concept image using K2 + FLUX.
+    Optional 'spec' param passes the redesign description for a more accurate image.
     """
     from fridge_observer.image_gen import generate_blueprint_image
     from fastapi.responses import Response
 
-    image_bytes = await generate_blueprint_image(product)
+    image_bytes = await generate_blueprint_image(product, redesign_spec=spec)
     if image_bytes:
         return Response(content=image_bytes, media_type="image/jpeg")
 
-    # SVG placeholder
     svg = _generate_placeholder_svg(product)
     return Response(content=svg.encode(), media_type="image/svg+xml")
 
