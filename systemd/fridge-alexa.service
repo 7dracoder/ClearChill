@@ -1,0 +1,17 @@
+[Unit]
+Description=Fridge Observer Alexa Skill Endpoint
+After=network.target fridge-api.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/fridge-observer
+EnvironmentFile=/home/pi/fridge-observer/.env
+ExecStart=/home/pi/fridge-observer/.venv/bin/gunicorn fridge_observer.alexa_skill:app --bind 0.0.0.0:5000 --workers 1
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

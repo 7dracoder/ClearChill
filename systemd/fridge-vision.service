@@ -1,0 +1,18 @@
+[Unit]
+Description=Fridge Observer Vision Processor
+After=network.target fridge-sensor.service
+Wants=fridge-sensor.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/fridge-observer
+EnvironmentFile=/home/pi/fridge-observer/.env
+ExecStart=/home/pi/fridge-observer/.venv/bin/python -m fridge_observer.vision_processor
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

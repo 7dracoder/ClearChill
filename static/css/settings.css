@@ -1,0 +1,227 @@
+/* ============================================================
+   Fridge Observer — Settings Page
+   settings.css
+   ============================================================ */
+
+/* ── Settings Layout ────────────────────────────────────────── */
+.settings-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: 720px;
+}
+
+/* ── Settings Section ───────────────────────────────────────── */
+.settings-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-section-header {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
+}
+
+.settings-section-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-section-desc {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+/* ── Setting Row ────────────────────────────────────────────── */
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  gap: var(--space-4);
+}
+
+.setting-row:last-child {
+  border-bottom: none;
+}
+
+.setting-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-label {
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.setting-description {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.setting-control {
+  flex-shrink: 0;
+}
+
+/* ── Toggle Switch ──────────────────────────────────────────── */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+  transition: background var(--transition-fast);
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 3px;
+  top: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: transform var(--transition-fast);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--color-accent);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(22px);
+}
+
+.toggle-switch input:focus + .toggle-slider {
+  box-shadow: 0 0 0 3px rgba(74, 124, 89, 0.2);
+}
+
+/* ── Threshold Input ────────────────────────────────────────── */
+.threshold-input-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.threshold-input {
+  width: 72px;
+  padding: var(--space-2) var(--space-3);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  text-align: center;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  outline: none;
+}
+
+.threshold-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(74, 124, 89, 0.15);
+}
+
+.threshold-unit {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* ── Validation Error ───────────────────────────────────────── */
+.validation-error {
+  font-size: var(--text-xs);
+  color: var(--color-expired);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+/* ── Settings Save Bar ──────────────────────────────────────── */
+.settings-save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Webhook URL input ──────────────────────────────────────── */
+.webhook-url-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.webhook-url-row .setting-control {
+  width: 100%;
+}
+
+.webhook-url-row .form-input {
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+}
+
+/* ── Temperature display ────────────────────────────────────── */
+.temp-display {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.temp-reading {
+  text-align: center;
+}
+
+.temp-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1;
+}
+
+.temp-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+}

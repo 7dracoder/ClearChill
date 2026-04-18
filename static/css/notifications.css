@@ -1,0 +1,221 @@
+/* ============================================================
+   Fridge Observer — Notifications & History
+   notifications.css
+   ============================================================ */
+
+/* ── Notifications Layout ───────────────────────────────────── */
+.notifications-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-6);
+}
+
+@media (min-width: 900px) {
+  .notifications-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .activity-log-section {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ── Activity Log ───────────────────────────────────────────── */
+.activity-log {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.log-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+  position: relative;
+}
+
+.log-entry:last-child {
+  border-bottom: none;
+}
+
+.log-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+  background: var(--color-surface-alt);
+}
+
+.log-icon.added { background: rgba(61, 153, 112, 0.12); }
+.log-icon.removed { background: rgba(168, 165, 158, 0.2); }
+.log-icon.updated { background: rgba(74, 124, 89, 0.1); }
+.log-icon.expired { background: rgba(217, 79, 61, 0.12); }
+
+.log-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.log-item-name {
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin-bottom: 2px;
+}
+
+.log-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.action-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.action-badge.added {
+  background: rgba(61, 153, 112, 0.12);
+  color: var(--color-ok);
+}
+
+.action-badge.removed {
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+}
+
+.action-badge.updated {
+  background: var(--color-accent-light);
+  color: var(--color-accent);
+}
+
+.action-badge.expired {
+  background: rgba(217, 79, 61, 0.12);
+  color: var(--color-expired);
+}
+
+.log-timestamp {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.log-source {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* ── Waste Report Card ──────────────────────────────────────── */
+.waste-report-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.waste-report-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  margin-bottom: var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.waste-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.waste-stat {
+  text-align: center;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+}
+
+.waste-stat.expired-stat {
+  background: rgba(217, 79, 61, 0.06);
+  border: 1px solid rgba(217, 79, 61, 0.15);
+}
+
+.waste-stat.consumed-stat {
+  background: rgba(61, 153, 112, 0.06);
+  border: 1px solid rgba(61, 153, 112, 0.15);
+}
+
+.waste-stat-number {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: var(--space-1);
+}
+
+.expired-stat .waste-stat-number { color: var(--color-expired); }
+.consumed-stat .waste-stat-number { color: var(--color-ok); }
+
+.waste-stat-label {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.waste-prev-week {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* ── Streak Card ────────────────────────────────────────────── */
+.streak-card {
+  background: linear-gradient(135deg, var(--color-accent-light) 0%, #d4ead9 100%);
+  border: 1px solid rgba(74, 124, 89, 0.2);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.streak-icon {
+  font-size: 48px;
+  margin-bottom: var(--space-3);
+  display: block;
+}
+
+.streak-number {
+  font-size: 64px;
+  font-weight: 800;
+  color: var(--color-accent);
+  line-height: 1;
+  margin-bottom: var(--space-2);
+  letter-spacing: -0.03em;
+}
+
+.streak-label {
+  font-size: var(--text-base);
+  color: var(--color-accent);
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+
+.streak-message {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}

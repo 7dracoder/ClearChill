@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Fridge Observer — Smart fridge monitoring to reduce food waste" />
+  <title>Fridge Observer</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="/static/css/main.css" />
+  <link rel="stylesheet" href="/static/css/layout.css" />
+  <link rel="stylesheet" href="/static/css/components.css" />
+  <link rel="stylesheet" href="/static/css/inventory.css" />
+  <link rel="stylesheet" href="/static/css/recipes.css" />
+  <link rel="stylesheet" href="/static/css/notifications.css" />
+  <link rel="stylesheet" href="/static/css/settings.css" />
+  <link rel="stylesheet" href="/static/css/ai-assistant.css" />
+</head>
+<body>
+
+<!-- ── App Shell ──────────────────────────────────────────── -->
+<div class="app-shell">
+
+  <!-- Sidebar (desktop) -->
+  <nav class="sidebar" role="navigation" aria-label="Main navigation">
+    <div class="sidebar-logo">
+      <span class="sidebar-logo-icon" aria-hidden="true">❄️</span>
+      <div>
+        <div class="sidebar-logo-text">Fridge Observer</div>
+        <div class="sidebar-logo-sub">Smart food tracking</div>
+      </div>
+    </div>
+
+    <ul class="sidebar-nav" role="list">
+      <li>
+        <div class="nav-item active" data-section="inventory" role="button" tabindex="0" aria-current="page">
+          <span class="nav-icon" aria-hidden="true">🥦</span>
+          <span class="nav-label">Inventory</span>
+        </div>
+      </li>
+      <li>
+        <div class="nav-item" data-section="recipes" role="button" tabindex="0">
+          <span class="nav-icon" aria-hidden="true">🍳</span>
+          <span class="nav-label">Recipes</span>
+        </div>
+      </li>
+      <li>
+        <div class="nav-item" data-section="notifications" role="button" tabindex="0">
+          <span class="nav-icon" aria-hidden="true">🔔</span>
+          <span class="nav-label">Notifications</span>
+        </div>
+      </li>
+      <li>
+        <div class="nav-item" data-section="settings" role="button" tabindex="0">
+          <span class="nav-icon" aria-hidden="true">⚙️</span>
+          <span class="nav-label">Settings</span>
+        </div>
+      </li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <div class="flex items-center gap-2">
+        <div class="connection-dot" title="Connecting..." aria-label="Connection status"></div>
+        <small class="text-muted">Live updates</small>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-content" id="main-content">
+
+    <!-- Content Header -->
+    <header class="content-header">
+      <h1 class="content-header-title">🥦 Inventory</h1>
+      <div class="header-actions">
+        <div class="connection-dot" title="Connecting..." aria-label="Connection status"></div>
+      </div>
+    </header>
+
+    <!-- Connection Banner -->
+    <div class="connection-banner" role="alert" aria-live="polite">
+      <span class="connection-banner-msg">⚠️ Disconnected from Fridge Observer. Updates paused.</span>
+      <button class="connection-banner-close" aria-label="Dismiss">×</button>
+    </div>
+
+    <!-- ── Inventory Section ─────────────────────────────── -->
+    <section id="section-inventory" class="content-section active" aria-label="Inventory">
+
+      <!-- Quick Add Form -->
+      <div class="quick-add-section">
+        <div class="quick-add-title">
+          <span aria-hidden="true">➕</span> Quick Add Item
+        </div>
+        <form id="quick-add-form" class="quick-add-form" novalidate>
+          <div class="form-group">
+            <label class="form-label sr-only" for="add-name">Item name</label>
+            <input
+              type="text"
+              id="add-name"
+              name="name"
+              class="form-input"
+              placeholder="Item name (e.g. Milk)"
+              required
+              autocomplete="off"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label sr-only" for="add-category">Category</label>
+            <select id="add-category" name="category" class="form-select">
+              <option value="fruits">🍎 Fruits</option>
+              <option value="vegetables">🥦 Vegetables</option>
+              <option value="dairy" selected>🧀 Dairy</option>
+              <option value="beverages">🥤 Beverages</option>
+              <option value="meat">🥩 Meat</option>
+              <option value="packaged_goods">📦 Packaged</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label sr-only" for="add-quantity">Quantity</label>
+            <input
+              type="number"
+              id="add-quantity"
+              name="quantity"
+              class="form-input"
+              placeholder="Qty"
+              value="1"
+              min="1"
+              max="99"
+            />
+          </div>
+          <div class="form-group">
+            <label class="form-label sr-only" for="add-expiry">Expiry date</label>
+            <input
+              type="date"
+              id="add-expiry"
+              name="expiry_date"
+              class="form-input"
+            />
+          </div>
+          <button type="submit" class="btn btn-primary">Add</button>
+        </form>
+      </div>
+
+      <!-- Inventory Stats -->
+      <div id="inventory-stats" class="inventory-stats"></div>
+
+      <!-- Filters -->
+      <div class="inventory-filters">
+        <div class="category-filters">
+          <button class="tag category-chip" data-category="fruits">🍎 Fruits</button>
+          <button class="tag category-chip" data-category="vegetables">🥦 Veggies</button>
+          <button class="tag category-chip" data-category="dairy">🧀 Dairy</button>
+          <button class="tag category-chip" data-category="beverages">🥤 Drinks</button>
+          <button class="tag category-chip" data-category="meat">🥩 Meat</button>
+          <button class="tag category-chip" data-category="packaged_goods">📦 Packaged</button>
+        </div>
+        <div class="sort-controls">
+          <select id="sort-by-select" class="form-select" aria-label="Sort by">
+            <option value="added_at">Date Added</option>
+            <option value="expiry_date">Expiry Date</option>
+            <option value="name">Name</option>
+            <option value="quantity">Quantity</option>
+          </select>
+          <select id="sort-dir-select" class="form-select" aria-label="Sort direction">
+            <option value="desc">↓ Desc</option>
+            <option value="asc">↑ Asc</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Inventory Grid -->
+      <div id="inventory-grid" class="inventory-grid" role="list" aria-label="Fridge contents">
+        <div class="loading-container" style="grid-column: 1 / -1;">
+          <div class="spinner spinner-lg"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Recipes Section ───────────────────────────────── -->
+    <section id="section-recipes" class="content-section" aria-label="Recipes">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Recipe Suggestions</h2>
+          <p class="section-subtitle">Ranked by how urgently your ingredients need to be used</p>
+        </div>
+      </div>
+
+      <!-- Recipe Filters -->
+      <div class="recipe-filters">
+        <div class="recipe-filter-chips">
+          <button class="tag dietary-chip" data-dietary="vegetarian">🌱 Vegetarian</button>
+          <button class="tag dietary-chip" data-dietary="vegan">🌿 Vegan</button>
+          <button class="tag dietary-chip" data-dietary="gluten-free">🌾 Gluten-Free</button>
+          <button class="tag" id="favorites-toggle">❤️ Favorites</button>
+        </div>
+        <div class="recipe-filter-controls">
+          <select id="cuisine-filter" class="form-select" aria-label="Filter by cuisine">
+            <option value="">All Cuisines</option>
+            <option value="Italian">Italian</option>
+            <option value="Asian">Asian</option>
+            <option value="Mexican">Mexican</option>
+            <option value="Indian">Indian</option>
+            <option value="French">French</option>
+            <option value="Mediterranean">Mediterranean</option>
+            <option value="American">American</option>
+          </select>
+          <div class="prep-time-filter">
+            <span>⏱</span>
+            <input type="range" id="prep-time-slider" min="5" max="60" value="60" step="5" aria-label="Max prep time" />
+            <span id="prep-time-label">Any</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recipe Grid -->
+      <div id="recipe-grid" class="recipe-grid" role="list" aria-label="Recipe suggestions">
+        <div class="loading-container" style="grid-column: 1 / -1;">
+          <div class="spinner spinner-lg"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Notifications Section ─────────────────────────── -->
+    <section id="section-notifications" class="content-section" aria-label="Notifications and History">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Notifications & History</h2>
+          <p class="section-subtitle">Activity log, waste report, and your zero-waste streak</p>
+        </div>
+      </div>
+
+      <div class="notifications-grid">
+        <!-- Waste Report -->
+        <div class="waste-report-card">
+          <div class="waste-report-title">
+            <span aria-hidden="true">📊</span> This Week's Report
+          </div>
+          <div id="waste-report">
+            <div class="loading-container"><div class="spinner"></div></div>
+          </div>
+        </div>
+
+        <!-- Streak -->
+        <div id="streak-display">
+          <div class="loading-container"><div class="spinner"></div></div>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="card activity-log-section">
+          <div class="card-header">
+            <h3 class="card-title">📋 Activity Log</h3>
+          </div>
+          <div id="activity-log" class="activity-log">
+            <div class="loading-container"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Settings Section ──────────────────────────────── -->
+    <section id="section-settings" class="content-section" aria-label="Settings">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">Settings</h2>
+          <p class="section-subtitle">Configure thresholds, integrations, and preferences</p>
+        </div>
+      </div>
+
+      <div class="settings-layout">
+
+        <!-- Current Temperature Display -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <div class="settings-section-title">🌡️ Current Temperature</div>
+            <div class="settings-section-desc">Live readings from your fridge sensor</div>
+          </div>
+          <div class="setting-row">
+            <div class="temp-display">
+              <div class="temp-reading">
+                <div class="temp-value mono" id="current-temp-fridge">—</div>
+                <div class="temp-label">Fridge</div>
+              </div>
+              <div style="width: 1px; background: var(--color-border); height: 40px;"></div>
+              <div class="temp-reading">
+                <div class="temp-value mono" id="current-temp-freezer">—</div>
+                <div class="temp-label">Freezer</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Spoilage Thresholds -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <div class="settings-section-title">⏰ Spoilage Thresholds</div>
+            <div class="settings-section-desc">Days before expiry to show a warning (1–14)</div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">🍎 Fruits</div>
+            </div>
+            <div class="setting-control threshold-input-group">
+              <input type="number" id="threshold-fruits" class="threshold-input" min="1" max="14" value="3" aria-label="Fruits threshold" />
+              <span class="threshold-unit">days</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">🥦 Vegetables</div>
+            </div>
+            <div class="setting-control threshold-input-group">
+              <input type="number" id="threshold-vegetables" class="threshold-input" min="1" max="14" value="2" aria-label="Vegetables threshold" />
+              <span class="threshold-unit">days</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">🧀 Dairy</div>
+            </div>
+            <div class="setting-control threshold-input-group">
+              <input type="number" id="threshold-dairy" class="threshold-input" min="1" max="14" value="3" aria-label="Dairy threshold" />
+              <span class="threshold-unit">days</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">🥤 Beverages</div>
+            </div>
+            <div class="setting-control threshold-input-group">
+              <input type="number" id="threshold-beverages" class="threshold-input" min="1" max="14" value="5" aria-label="Beverages threshold" />
+              <span class="threshold-unit">days</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">🥩 Meat</div>
+            </div>
+            <div class="setting-control threshold-input-group">
+              <input type="number" id="threshold-meat" class="threshold-input" min="1" max="14" value="1" aria-label="Meat threshold" />
+              <span class="threshold-unit">days</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">📦 Packaged Goods</div>
+            </div>
+            <div class="setting-control threshold-input-group">
+              <input type="number" id="threshold-packaged_goods" class="threshold-input" min="1" max="14" value="7" aria-label="Packaged goods threshold" />
+              <span class="threshold-unit">days</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Temperature Thresholds -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <div class="settings-section-title">🌡️ Temperature Thresholds</div>
+            <div class="settings-section-desc">Alert when temperature exceeds these values</div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Fridge compartment</div>
+              <div class="setting-description">Safe range: 0–10°C</div>
+            </div>
+            <div class="setting-control threshold-input-group">
+              <input type="number" id="temp-fridge" class="threshold-input" min="0" max="10" step="0.5" value="8" aria-label="Fridge temperature threshold" />
+              <span class="threshold-unit">°C</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Freezer compartment</div>
+              <div class="setting-description">Safe range: -30 to -10°C</div>
+            </div>
+            <div class="setting-control threshold-input-group">
+              <input type="number" id="temp-freezer" class="threshold-input" min="-30" max="-10" step="0.5" value="-15" aria-label="Freezer temperature threshold" />
+              <span class="threshold-unit">°C</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Integrations -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <div class="settings-section-title">🔗 Integrations</div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Shopping List Integration</div>
+              <div class="setting-description">Automatically add depleted items to your shopping list</div>
+            </div>
+            <div class="setting-control">
+              <label class="toggle-switch" aria-label="Enable shopping list integration">
+                <input type="checkbox" id="shopping-list-toggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="setting-row webhook-url-row" id="webhook-url-row" style="display:none;">
+            <div class="setting-info">
+              <div class="setting-label">Webhook URL</div>
+              <div class="setting-description">Your shopping list API endpoint</div>
+            </div>
+            <div class="setting-control" style="width: 100%;">
+              <input
+                type="url"
+                id="webhook-url"
+                class="form-input"
+                placeholder="https://api.yourshopping.app/webhook"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Echo Dot Voice Alerts</div>
+              <div class="setting-description">Receive spoken alerts and inventory summaries via Alexa</div>
+            </div>
+            <div class="setting-control">
+              <label class="toggle-switch" aria-label="Enable Echo Dot voice alerts">
+                <input type="checkbox" id="echo-dot-toggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gamification -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <div class="settings-section-title">🎮 Gamification</div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-label">Zero-Waste Streak</div>
+              <div class="setting-description">Track consecutive weeks with no expired food</div>
+            </div>
+            <div class="setting-control">
+              <label class="toggle-switch" aria-label="Enable zero-waste streak tracking">
+                <input type="checkbox" id="gamification-toggle" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Save Bar -->
+        <div class="settings-save-bar">
+          <button class="btn btn-secondary" id="settings-reset-btn" type="button">Reset</button>
+          <button class="btn btn-primary" id="settings-save-btn" type="button">Save Settings</button>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ── Bottom Tab Bar (mobile) ──────────────────────────── -->
+<nav class="tab-bar" role="navigation" aria-label="Mobile navigation">
+  <div class="tab-item active" data-section="inventory" role="button" tabindex="0" aria-label="Inventory">
+    <span class="tab-icon" aria-hidden="true">🥦</span>
+    <span class="tab-label">Inventory</span>
+  </div>
+  <div class="tab-item" data-section="recipes" role="button" tabindex="0" aria-label="Recipes">
+    <span class="tab-icon" aria-hidden="true">🍳</span>
+    <span class="tab-label">Recipes</span>
+  </div>
+  <div class="tab-item" data-section="notifications" role="button" tabindex="0" aria-label="Notifications">
+    <span class="tab-icon" aria-hidden="true">🔔</span>
+    <span class="tab-label">Alerts</span>
+  </div>
+  <div class="tab-item" data-section="settings" role="button" tabindex="0" aria-label="Settings">
+    <span class="tab-icon" aria-hidden="true">⚙️</span>
+    <span class="tab-label">Settings</span>
+  </div>
+</nav>
+
+<!-- ── Edit Item Modal ───────────────────────────────────── -->
+<div id="edit-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="edit-modal-title">Edit Item</h2>
+      <button class="modal-close" id="edit-modal-close" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="edit-modal-form">
+        <div class="form-group">
+          <label class="form-label" for="edit-name">Item Name</label>
+          <input type="text" id="edit-name" class="form-input" placeholder="e.g. Whole Milk" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-category">Category</label>
+          <select id="edit-category" class="form-select">
+            <option value="fruits">🍎 Fruits</option>
+            <option value="vegetables">🥦 Vegetables</option>
+            <option value="dairy">🧀 Dairy</option>
+            <option value="beverages">🥤 Beverages</option>
+            <option value="meat">🥩 Meat</option>
+            <option value="packaged_goods">📦 Packaged Goods</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-quantity">Quantity</label>
+          <input type="number" id="edit-quantity" class="form-input" min="1" max="99" value="1" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-expiry">Expiry Date</label>
+          <input type="date" id="edit-expiry" class="form-input" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-notes">Notes (optional)</label>
+          <input type="text" id="edit-notes" class="form-input" placeholder="Any notes..." />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="edit-cancel-btn">Cancel</button>
+      <button class="btn btn-primary" id="edit-save-btn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast Container ───────────────────────────────────── -->
+<div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+<!-- ── JavaScript ────────────────────────────────────────── -->
+<script src="/static/js/ws-client.js"></script>
+<script src="/static/js/inventory.js"></script>
+<script src="/static/js/recipes.js"></script>
+<script src="/static/js/notifications.js"></script>
+<script src="/static/js/settings.js"></script>
+<script src="/static/js/app.js"></script>
+<script src="/static/js/ai-assistant.js"></script>
+
+</body>
+</html>

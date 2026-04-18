@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fridge Observer — Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/auth.css" />
+</head>
+<body class="auth-body">
+
+  <div class="auth-container">
+
+    <!-- Left panel — branding -->
+    <div class="auth-brand">
+      <div class="auth-brand-inner">
+        <div class="auth-logo">❄️</div>
+        <h1 class="auth-brand-title">Fridge Observer</h1>
+        <p class="auth-brand-sub">Smart food tracking to reduce waste and inspire cooking.</p>
+        <ul class="auth-features">
+          <li><span class="auth-feature-icon">🥦</span> Track what's in your fridge in real time</li>
+          <li><span class="auth-feature-icon">⏰</span> Get alerts before food expires</li>
+          <li><span class="auth-feature-icon">🍳</span> Recipes ranked by what needs using first</li>
+          <li><span class="auth-feature-icon">✨</span> AI assistant powered by K2-Think</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Right panel — form -->
+    <div class="auth-form-panel">
+      <div class="auth-form-inner">
+
+        <!-- Tab switcher -->
+        <div class="auth-tabs" role="tablist">
+          <button class="auth-tab active" id="tab-login" role="tab" aria-selected="true" aria-controls="panel-login">
+            Sign In
+          </button>
+          <button class="auth-tab" id="tab-signup" role="tab" aria-selected="false" aria-controls="panel-signup">
+            Create Account
+          </button>
+        </div>
+
+        <!-- ── Login Panel ─────────────────────────────── -->
+        <div id="panel-login" class="auth-panel active" role="tabpanel">
+          <h2 class="auth-form-title">Welcome back</h2>
+          <p class="auth-form-sub">Sign in to your Fridge Observer account</p>
+
+          <form id="login-form" class="auth-form" novalidate>
+            <div class="auth-field">
+              <label class="auth-label" for="login-email">Email address</label>
+              <input
+                type="email"
+                id="login-email"
+                name="email"
+                class="auth-input"
+                placeholder="you@example.com"
+                autocomplete="email"
+                required
+              />
+              <span class="auth-field-error" id="login-email-error"></span>
+            </div>
+
+            <div class="auth-field">
+              <div class="auth-label-row">
+                <label class="auth-label" for="login-password">Password</label>
+                <button type="button" class="auth-link-btn" id="forgot-password-btn">Forgot password?</button>
+              </div>
+              <div class="auth-input-wrap">
+                <input
+                  type="password"
+                  id="login-password"
+                  name="password"
+                  class="auth-input"
+                  placeholder="Your password"
+                  autocomplete="current-password"
+                  required
+                />
+                <button type="button" class="auth-toggle-pw" aria-label="Show password" data-target="login-password">👁</button>
+              </div>
+              <span class="auth-field-error" id="login-password-error"></span>
+            </div>
+
+            <label class="auth-checkbox-row">
+              <input type="checkbox" id="remember-me" name="remember_me" />
+              <span class="auth-checkbox-label">Remember me for 30 days</span>
+            </label>
+
+            <div class="auth-error-banner" id="login-error" role="alert" aria-live="polite"></div>
+
+            <button type="submit" class="auth-btn" id="login-submit">
+              <span class="auth-btn-text">Sign In</span>
+              <span class="auth-btn-spinner" aria-hidden="true"></span>
+            </button>
+          </form>
+
+          <p class="auth-switch-text">
+            Don't have an account?
+            <button type="button" class="auth-link-btn" id="go-signup">Create one</button>
+          </p>
+        </div>
+
+        <!-- ── Signup Panel ────────────────────────────── -->
+        <div id="panel-signup" class="auth-panel" role="tabpanel">
+          <h2 class="auth-form-title">Create your account</h2>
+          <p class="auth-form-sub">Start tracking your fridge for free</p>
+
+          <form id="signup-form" class="auth-form" novalidate>
+            <div class="auth-field">
+              <label class="auth-label" for="signup-name">Your name</label>
+              <input
+                type="text"
+                id="signup-name"
+                name="display_name"
+                class="auth-input"
+                placeholder="Alex Smith"
+                autocomplete="name"
+                required
+              />
+              <span class="auth-field-error" id="signup-name-error"></span>
+            </div>
+
+            <div class="auth-field">
+              <label class="auth-label" for="signup-email">Email address</label>
+              <input
+                type="email"
+                id="signup-email"
+                name="email"
+                class="auth-input"
+                placeholder="you@example.com"
+                autocomplete="email"
+                required
+              />
+              <span class="auth-field-error" id="signup-email-error"></span>
+            </div>
+
+            <div class="auth-field">
+              <label class="auth-label" for="signup-password">Password</label>
+              <div class="auth-input-wrap">
+                <input
+                  type="password"
+                  id="signup-password"
+                  name="password"
+                  class="auth-input"
+                  placeholder="At least 8 characters"
+                  autocomplete="new-password"
+                  required
+                />
+                <button type="button" class="auth-toggle-pw" aria-label="Show password" data-target="signup-password">👁</button>
+              </div>
+              <div class="auth-password-strength" id="pw-strength" aria-live="polite"></div>
+              <span class="auth-field-error" id="signup-password-error"></span>
+            </div>
+
+            <div class="auth-field">
+              <label class="auth-label" for="signup-confirm">Confirm password</label>
+              <div class="auth-input-wrap">
+                <input
+                  type="password"
+                  id="signup-confirm"
+                  name="confirm_password"
+                  class="auth-input"
+                  placeholder="Repeat your password"
+                  autocomplete="new-password"
+                  required
+                />
+                <button type="button" class="auth-toggle-pw" aria-label="Show password" data-target="signup-confirm">👁</button>
+              </div>
+              <span class="auth-field-error" id="signup-confirm-error"></span>
+            </div>
+
+            <div class="auth-error-banner" id="signup-error" role="alert" aria-live="polite"></div>
+
+            <button type="submit" class="auth-btn" id="signup-submit">
+              <span class="auth-btn-text">Create Account</span>
+              <span class="auth-btn-spinner" aria-hidden="true"></span>
+            </button>
+          </form>
+
+          <p class="auth-switch-text">
+            Already have an account?
+            <button type="button" class="auth-link-btn" id="go-login">Sign in</button>
+          </p>
+        </div>
+
+        <!-- ── OTP Verification Panel ─────────────────── -->
+        <div id="panel-verify" class="auth-panel" role="tabpanel" style="display:none;">
+          <div style="text-align:center; margin-bottom: 28px;">
+            <div style="font-size:48px; margin-bottom:12px;">📬</div>
+            <h2 class="auth-form-title">Check your email</h2>
+            <p class="auth-form-sub" id="verify-sub">We sent a 6-digit code to <strong id="verify-email-display"></strong></p>
+          </div>
+
+          <form id="verify-form" class="auth-form" novalidate>
+            <div class="auth-field">
+              <label class="auth-label" for="otp-input">Verification code</label>
+              <input
+                type="text"
+                id="otp-input"
+                name="code"
+                class="auth-input otp-input"
+                placeholder="000000"
+                maxlength="6"
+                inputmode="numeric"
+                pattern="[0-9]{6}"
+                autocomplete="one-time-code"
+                required
+              />
+              <span class="auth-field-error" id="otp-error"></span>
+            </div>
+
+            <div class="auth-error-banner" id="verify-error" role="alert" aria-live="polite"></div>
+
+            <button type="submit" class="auth-btn" id="verify-submit">
+              <span class="auth-btn-text">Verify Email</span>
+              <span class="auth-btn-spinner" aria-hidden="true"></span>
+            </button>
+          </form>
+
+          <p class="auth-switch-text" style="margin-top:16px;">
+            Didn't receive it?
+            <button type="button" class="auth-link-btn" id="resend-otp-btn">Resend code</button>
+            <span id="resend-countdown" style="font-size:13px; color:var(--color-text-muted); display:none;"></span>
+          </p>
+          <p class="auth-switch-text" style="margin-top:8px;">
+            <button type="button" class="auth-link-btn" id="back-to-signup">← Back to sign up</button>
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/auth.js"></script>
+</body>
+</html>

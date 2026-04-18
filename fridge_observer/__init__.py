@@ -1,0 +1,1 @@
+# Fridge Observer package

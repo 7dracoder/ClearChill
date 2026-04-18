@@ -1,0 +1,60 @@
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.Python
+pip-wheel-metadata/
+
+# ── Virtual environments ──────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Environment variables (NEVER commit secrets) ──────────────
+.env
+.env.local
+.env.*.local
+
+# ── Database (auto-generated on first run) ────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Logs ─────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── OS files ─────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ── IDE / Editor ──────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Kiro internal ─────────────────────────────────────────────
+.kiro/
+
+# ── Test / coverage artifacts ─────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.hypothesis/
+
+# ── Thumbnails uploaded by the app ───────────────────────────
+static/images/thumbnails/

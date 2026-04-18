@@ -1,0 +1,18 @@
+[Unit]
+Description=Fridge Observer Sensor Service
+After=network.target mosquitto.service fridge-api.service
+Wants=mosquitto.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/fridge-observer
+EnvironmentFile=/home/pi/fridge-observer/.env
+ExecStart=/home/pi/fridge-observer/.venv/bin/python -m fridge_observer.sensor_service
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

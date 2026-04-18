@@ -1,0 +1,18 @@
+[Unit]
+Description=Fridge Observer API Server
+After=network.target mosquitto.service
+Wants=mosquitto.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/fridge-observer
+EnvironmentFile=/home/pi/fridge-observer/.env
+ExecStart=/home/pi/fridge-observer/.venv/bin/python -m uvicorn fridge_observer.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
