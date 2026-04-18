@@ -259,39 +259,33 @@ async def receive_captured_image(
         auto_add = [item for item in detected_items if not item["needs_expiry_input"]]
         
         # Auto-add items with estimated expiry to inventory
-        from fridge_observer.db import get_db
+        from fridge_observer.supabase_client import get_supabase
         from fridge_observer.ws_manager import manager
         
+        sb = get_supabase()
         added_items = []
-        async with get_db() as db:
-            for item in auto_add:
-                expiry_date = datetime.utcnow() + timedelta(days=item["estimated_expiry_days"])
-                
-                # Insert into inventory
-                await db.execute(
-                    """
-                    INSERT INTO food_items (name, category, quantity, expiry_date, user_id, added_via)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        item["name"],
-                        item["category"],
-                        1,
-                        expiry_date.date().isoformat(),
-                        current_user["id"],
-                        "hardware_auto"
-                    )
-                )
-                await db.commit()
-                
-                added_items.append({
-                    "name": item["name"],
-                    "category": item["category"],
-                    "expiry_date": expiry_date.date().isoformat(),
-                    "estimated_days": item["estimated_expiry_days"]
-                })
-                
-                logger.info(f"Auto-added {item['name']} with expiry {expiry_date.date()}")
+        
+        for item in auto_add:
+            expiry_date = datetime.utcnow() + timedelta(days=item["estimated_expiry_days"])
+            
+            # Insert into Supabase inventory
+            result = sb.table("food_items").insert({
+                "name": item["name"],
+                "category": item["category"],
+                "quantity": 1,
+                "expiry_date": expiry_date.date().isoformat(),
+                "user_id": current_user["sub"],
+                "added_via": "hardware_auto"
+            }).execute()
+            
+            added_items.append({
+                "name": item["name"],
+                "category": item["category"],
+                "expiry_date": expiry_date.date().isoformat(),
+                "estimated_days": item["estimated_expiry_days"]
+            })
+            
+            logger.info(f"Auto-added {item['name']} with expiry {expiry_date.date()}")
         
         # Send WebSocket notification for real-time UI update
         if added_items:
@@ -362,7 +356,7 @@ async def add_item_with_expiry(
     """
     try:
         from datetime import datetime
-        from fridge_observer.db import get_db
+        from fridge_observer.supabase_client import get_supabase
         from fridge_observer.ws_manager import manager
         
         # Parse expiry date
@@ -373,24 +367,18 @@ async def add_item_with_expiry(
         # Determine category based on item name
         category = _guess_category(expiry_input.item_name)
         
-        # Add to inventory
-        async with get_db() as db:
-            cursor = await db.execute(
-                """
-                INSERT INTO food_items (name, category, quantity, expiry_date, user_id, added_via)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    expiry_input.item_name,
-                    category,
-                    expiry_input.quantity,
-                    expiry_date.date().isoformat(),
-                    current_user["id"],
-                    "hardware_voice"
-                )
-            )
-            await db.commit()
-            item_id = cursor.lastrowid
+        # Add to Supabase inventory
+        sb = get_supabase()
+        result = sb.table("food_items").insert({
+            "name": expiry_input.item_name,
+            "category": category,
+            "quantity": expiry_input.quantity,
+            "expiry_date": expiry_date.date().isoformat(),
+            "user_id": current_user["sub"],
+            "added_via": "hardware_voice"
+        }).execute()
+        
+        item_id = result.data[0]["id"] if result.data else None
         
         # Send WebSocket notification for real-time UI update
         await manager.broadcast({

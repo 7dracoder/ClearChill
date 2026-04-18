@@ -86,22 +86,43 @@ See `RASPBERRY_PI_SETUP.md` for detailed instructions.
 
 ## How It Works
 
-1. You open your fridge door
-2. Light sensor detects the door opening
-3. Camera captures an image after 2 seconds
-4. Image is sent to your server via WiFi
-5. Gemini AI identifies the food items
-6. Fresh items get automatic expiry estimates
-7. Items are added to your inventory database
-8. Web app updates in real-time via WebSocket
+**Complete Workflow:**
 
-The whole process takes about 5-6 seconds from door open to seeing items in your app.
+1. **You open your fridge door**
+2. **Raspberry Pi detects door opening** (light sensor)
+3. **Pi captures image** (webcam after 2 seconds)
+4. **Pi sends image to web app** (via WiFi)
+5. **Web app detects food items** (Gemini AI Vision)
+6. **Web app determines item type**:
+   - **Fresh items** (fruits, vegetables, meat) → Auto-estimates expiry date → Adds to inventory
+   - **Packaged items** (milk, yogurt, etc.) → Waits for expiry date
+7. **For packaged items**: Google Home asks "When does the milk expire?"
+8. **You respond**: "April 25th"
+9. **Google Home sends expiry to web app** → Adds to inventory
+10. **Web app updates in real-time** (WebSocket)
+
+**Time**: 5-6 seconds from door open to seeing items in your app
+
+**All detection happens in the web app, not on the Pi!**
 
 ## Testing Hardware Integration
 
+Test the complete workflow locally:
+
 ```bash
-python test_hardware_integration.py
+# Start the server
+python -m uvicorn fridge_observer.main:app --reload
+
+# In another terminal, run the test
+python test_hardware_workflow.py
 ```
+
+This simulates:
+- Pi sending images
+- AI detecting food items
+- Auto-adding fresh items
+- Google Home adding packaged items
+- Real-time inventory updates
 
 ## Documentation
 
