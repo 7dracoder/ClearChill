@@ -245,7 +245,23 @@ class AIAssistant {
         body: JSON.stringify({ question: text }),
       });
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        // Try to get error message from response
+        let errorMsg = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMsg = errorData.detail || errorMsg;
+        } catch (e) {
+          // If not JSON, try text
+          try {
+            const errorText = await response.text();
+            if (errorText) errorMsg = errorText;
+          } catch (e2) {
+            // Keep default error message
+          }
+        }
+        throw new Error(errorMsg);
+      }
 
       this._removeThinking();
       const bubble = this._addAssistantMessage();
