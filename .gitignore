@@ -36,6 +36,8 @@ env/
 
 # Database
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 fridge_observer.db
@@ -46,6 +48,7 @@ logs/
 *.log.*
 
 # IDE
+.kiro/
 .vscode/
 .idea/
 *.swp
