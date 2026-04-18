@@ -16,6 +16,12 @@ async def init_db() -> None:
         # Enable WAL mode for better concurrency and crash safety
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA foreign_keys=ON")
+        
+        # Performance optimizations for production
+        await db.execute("PRAGMA synchronous=NORMAL")  # Faster writes, still safe
+        await db.execute("PRAGMA cache_size=-64000")   # 64MB cache
+        await db.execute("PRAGMA temp_store=MEMORY")   # Use memory for temp tables
+        await db.execute("PRAGMA mmap_size=268435456") # 256MB memory-mapped I/O
 
         # Run integrity check on startup
         cursor = await db.execute("PRAGMA integrity_check")
@@ -36,6 +42,8 @@ async def get_db():
         db.row_factory = aiosqlite.Row
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA foreign_keys=ON")
+        await db.execute("PRAGMA synchronous=NORMAL")
+        await db.execute("PRAGMA cache_size=-64000")
         try:
             yield db
         except Exception:
