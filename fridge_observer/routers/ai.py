@@ -58,12 +58,11 @@ class IdentifyResponse(BaseModel):
 # ── Helpers ───────────────────────────────────────────────────
 
 async def _get_inventory() -> list[dict]:
-    async with get_db() as db:
-        cursor = await db.execute(
-            "SELECT id, name, category, quantity, expiry_date FROM food_items ORDER BY expiry_date ASC"
-        )
-        rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
+    from fridge_observer.supabase_client import get_supabase
+    sb = get_supabase()
+    # Get all items (no user filtering for local dev)
+    result = sb.table("food_items").select("id, name, category, quantity, expiry_date").order("expiry_date").execute()
+    return result.data or []
 
 
 # ── Endpoints ─────────────────────────────────────────────────

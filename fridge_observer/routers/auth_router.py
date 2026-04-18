@@ -109,6 +109,11 @@ def _set_session_cookie(response: Response, access_token: str, remember_me: bool
 
 def get_current_user(fridge_session: Optional[str] = Cookie(default=None)) -> dict:
     """FastAPI dependency — validates Supabase JWT locally (no network call)."""
+    # For local development without Supabase, return a dummy user
+    import os
+    if os.environ.get("ENVIRONMENT") != "production" and not fridge_session:
+        return {"sub": "local-user", "email": "local@localhost"}
+    
     if not fridge_session:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:

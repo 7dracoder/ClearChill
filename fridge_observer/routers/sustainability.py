@@ -52,13 +52,11 @@ def _extract_answer(text: str) -> str:
 @router.get("/inventory-items")
 async def get_inventory_items():
     """Get all inventory items for EcoScan - synced with dashboard inventory."""
-    from fridge_observer.db import get_db
-    async with get_db() as db:
-        cursor = await db.execute(
-            "SELECT id, name, category FROM food_items ORDER BY name"
-        )
-        rows = await cursor.fetchall()
-        return [dict(row) for row in rows]
+    from fridge_observer.supabase_client import get_supabase
+    sb = get_supabase()
+    # Get all items (no user filtering for local dev)
+    result = sb.table("food_items").select("id, name, category").order("name").execute()
+    return result.data or []
 
 
 @router.post("/analyse-product")
