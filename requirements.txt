@@ -19,7 +19,7 @@ replicate==0.22.0
 
 # Image Processing
 Pillow==10.2.0
-opencv-python==4.9.0.80
+opencv-python-headless==4.9.0.80
 
 # Environment and Configuration
 python-dotenv==1.0.0
