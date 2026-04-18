@@ -1,10 +1,11 @@
 /**
  * Fridge Observer — Auth Page
- * auth.js: Login, signup, and OTP verification logic
+ * auth.js: Login, signup, and OTP verification
  */
 
 // ── State ─────────────────────────────────────────────────────
 let _pendingEmail = '';
+let _pendingPassword = '';  // stored temporarily to auto-login after OTP
 let _resendTimer = null;
 
 // ── Tab switching ─────────────────────────────────────────────
@@ -25,13 +26,11 @@ function showTab(tab) {
   tabLogin.setAttribute('aria-selected', String(isLogin));
   tabSignup.setAttribute('aria-selected', String(isSignup));
 
-  // Hide tabs row when on verify screen
   document.querySelector('.auth-tabs').style.display = isVerify ? 'none' : '';
 
   panelLogin.classList.toggle('active', isLogin);
   panelSignup.classList.toggle('active', isSignup);
 
-  // panel-verify needs explicit show/hide since it's outside the tab system
   if (panelVerify) {
     panelVerify.style.display = isVerify ? 'block' : 'none';
     panelVerify.classList.toggle('active', isVerify);
@@ -154,7 +153,6 @@ function startResendCountdown(seconds = 60) {
 
   btn.style.display = 'none';
   countdown.style.display = 'inline';
-
   let remaining = seconds;
   countdown.textContent = `Resend in ${remaining}s`;
 
@@ -215,6 +213,7 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
   setLoading('signup-submit', false);
 
   if (ok) {
+    _pendingPassword = password; // store for auto-login after OTP
     showVerifyScreen(email);
   } else {
     const msg = data.detail || 'Something went wrong. Please try again.';
@@ -239,31 +238,83 @@ document.getElementById('verify-form').addEventListener('submit', async (e) => {
   }
 
   setLoading('verify-submit', true);
-  const { ok, status, data } = await apiPost('/auth/verify-otp', {
+
+  // Step 1: Verify the OTP
+  const { ok, status, data } = await apiPost('/auth/verify-otp-and-login', {
     email: _pendingEmail,
     code,
   });
-  setLoading('verify-submit', false);
 
-  if (ok) {
-    // Show success then redirect to app
-    panelVerify.innerHTML = `
-      <div class="auth-success">
-        <div class="auth-success-icon">🎉</div>
-        <h3>Email verified!</h3>
-        <p>Welcome, ${escapeHtml(data.display_name)}. Taking you to your fridge...</p>
-      </div>
-    `;
-    setTimeout(() => { window.location.href = '/'; }, 1500);
-  } else {
+  if (!ok) {
+    setLoading('verify-submit', false);
     const msg = data.detail || 'Invalid code. Please try again.';
     if (status === 409) {
-      // Already verified — redirect to login
       setBannerError('verify-error', 'This email is already verified. Redirecting to sign in...');
       setTimeout(() => showTab('login'), 2000);
     } else {
       setBannerError('verify-error', msg);
     }
+    return;
+  }
+
+  // Step 2: Auto-login with stored password
+  if (_pendingPassword) {
+    const loginResult = await apiPost('/auth/login', {
+      email: _pendingEmail,
+      password: _pendingPassword,
+      remember_me: false,
+    });
+
+    setLoading('verify-submit', false);
+
+    if (loginResult.ok) {
+      // Show success and redirect to app
+      if (panelVerify) {
+        panelVerify.innerHTML = `
+          <div class="auth-success">
+            <div class="auth-success-icon">🎉</div>
+            <h3>Email verified!</h3>
+            <p>Welcome, ${escapeHtml(data.display_name || '')}! Taking you to your fridge...</p>
+          </div>
+        `;
+      }
+      _pendingPassword = '';
+      setTimeout(() => { window.location.href = '/'; }, 1500);
+    } else {
+      // Login failed — redirect to login page with email pre-filled
+      if (panelVerify) {
+        panelVerify.innerHTML = `
+          <div class="auth-success">
+            <div class="auth-success-icon">✅</div>
+            <h3>Email verified!</h3>
+            <p>Please sign in with your password to continue.</p>
+          </div>
+        `;
+      }
+      _pendingPassword = '';
+      setTimeout(() => {
+        showTab('login');
+        const emailInput = document.getElementById('login-email');
+        if (emailInput) emailInput.value = _pendingEmail;
+      }, 2000);
+    }
+  } else {
+    setLoading('verify-submit', false);
+    // No stored password — redirect to login
+    if (panelVerify) {
+      panelVerify.innerHTML = `
+        <div class="auth-success">
+          <div class="auth-success-icon">✅</div>
+          <h3>Email verified!</h3>
+          <p>Please sign in with your password to continue.</p>
+        </div>
+      `;
+    }
+    setTimeout(() => {
+      showTab('login');
+      const emailInput = document.getElementById('login-email');
+      if (emailInput) emailInput.value = _pendingEmail;
+    }, 2000);
   }
 });
 
@@ -276,16 +327,12 @@ document.getElementById('resend-otp-btn').addEventListener('click', async () => 
 
   if (ok) {
     setBannerError('verify-error', '');
-    // Show a brief success message
     const sub = document.getElementById('verify-sub');
     const orig = sub.innerHTML;
     sub.innerHTML = '✅ New code sent! Check your inbox.';
     sub.style.color = 'var(--color-ok)';
     startResendCountdown(60);
-    setTimeout(() => {
-      sub.innerHTML = orig;
-      sub.style.color = '';
-    }, 4000);
+    setTimeout(() => { sub.innerHTML = orig; sub.style.color = ''; }, 4000);
   } else {
     const msg = data.detail || 'Could not resend. Please try again.';
     setBannerError('verify-error', msg);
@@ -299,8 +346,8 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   clearErrors();
 
-  const email    = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
+  const email      = document.getElementById('login-email').value.trim();
+  const password   = document.getElementById('login-password').value;
   const rememberMe = document.getElementById('remember-me').checked;
 
   let valid = true;
@@ -318,7 +365,6 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     window.location.href = '/';
   } else {
     if (status === 403 && data.detail?.includes('verify')) {
-      // Unverified account — send them to OTP screen
       _pendingEmail = email;
       setBannerError('login-error', 'Please verify your email first. Sending a new code...');
       await apiPost('/auth/resend-otp', { email });
