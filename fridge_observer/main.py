@@ -26,6 +26,7 @@ from fridge_observer.routers import ai as ai_router
 from fridge_observer.routers import auth_router
 from fridge_observer.routers import sustainability as sustainability_router
 from fridge_observer.routers import hardware as hardware_router
+from fridge_observer.routers import voice as voice_router
 from fridge_observer.seed_recipes import seed_recipes
 
 logging.basicConfig(
@@ -97,6 +98,7 @@ app.include_router(settings.router)
 app.include_router(ai_router.router)
 app.include_router(sustainability_router.router)
 app.include_router(hardware_router.router)
+app.include_router(voice_router.router)
 
 
 @app.websocket("/ws")

@@ -4,7 +4,7 @@ Hardware integration endpoints for Raspberry Pi sensor
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict, Any
 import logging
 
 from fridge_observer.auth import get_current_user
@@ -179,10 +179,18 @@ class DetectedItem(BaseModel):
     category: Optional[str] = None
 
 
+class ItemWithUserInput(BaseModel):
+    item_name: str
+    quantity: int  # REQUIRED - Google Home asks for this
+    expiry_date: Optional[str] = None  # ISO format: "2026-04-25" - only for packaged items
+    category: Optional[str] = None
+    estimated_expiry_days: Optional[int] = None  # For fresh items
+
+
 class ExpiryDateInput(BaseModel):
     item_name: str
+    quantity: int
     expiry_date: str  # ISO format: "2026-04-25"
-    quantity: Optional[int] = 1
 
 
 @router.post("/door-event")
@@ -254,55 +262,28 @@ async def receive_captured_image(
                 "estimated_expiry_days": expiry_days if not is_packaged else None
             })
         
-        # Separate items that need user input vs auto-add
-        needs_expiry = [item for item in detected_items if item["needs_expiry_input"]]
-        auto_add = [item for item in detected_items if not item["needs_expiry_input"]]
+        # ALL items need user input for quantity AND expiry (for packaged items)
+        # Google Home will ask:
+        # 1. For ALL items: "What's the quantity?"
+        # 2. For packaged items only: "What's the expiry date?"
         
-        # Auto-add items with estimated expiry to inventory
-        from fridge_observer.supabase_client import get_supabase
-        from fridge_observer.ws_manager import manager
-        
-        sb = get_supabase()
-        added_items = []
-        
-        for item in auto_add:
-            expiry_date = datetime.utcnow() + timedelta(days=item["estimated_expiry_days"])
-            
-            # Insert into Supabase inventory
-            result = sb.table("food_items").insert({
+        needs_user_input = []
+        for item in detected_items:
+            needs_user_input.append({
                 "name": item["name"],
                 "category": item["category"],
-                "quantity": 1,
-                "expiry_date": expiry_date.date().isoformat(),
-                "user_id": current_user["sub"],
-                "added_via": "hardware_auto"
-            }).execute()
-            
-            added_items.append({
-                "name": item["name"],
-                "category": item["category"],
-                "expiry_date": expiry_date.date().isoformat(),
-                "estimated_days": item["estimated_expiry_days"]
-            })
-            
-            logger.info(f"Auto-added {item['name']} with expiry {expiry_date.date()}")
-        
-        # Send WebSocket notification for real-time UI update
-        if added_items:
-            await manager.broadcast({
-                "type": "inventory_updated",
-                "action": "items_added",
-                "items": added_items,
-                "source": "hardware_auto"
+                "confidence": item["confidence"],
+                "needs_quantity": True,  # Always ask for quantity
+                "needs_expiry": item["needs_expiry_input"],  # Only packaged items
+                "estimated_expiry_days": item["estimated_expiry_days"]
             })
         
-        logger.info(f"Detected {len(detected_items)} items: {len(needs_expiry)} need expiry input, {len(auto_add)} auto-added")
+        logger.info(f"Detected {len(detected_items)} items - ALL need quantity input, {len([i for i in detected_items if i['needs_expiry_input']])} also need expiry")
         
         return {
             "status": "processed",
             "total_items": len(detected_items),
-            "needs_expiry_input": needs_expiry,  # Google Home will ask for these
-            "auto_added": added_items,  # Already added to inventory
+            "needs_user_input": needs_user_input,  # Google Home will ask for quantity + expiry
             "timestamp": datetime.utcnow().isoformat() + "Z"
         }
         
@@ -446,3 +427,130 @@ def _guess_category(item_name: str) -> str:
     
     # Default to packaged goods
     return "packaged_goods"
+
+
+# ── New Session-Based Endpoints ──────────────────────────────────────────
+
+class CaptureSessionComplete(BaseModel):
+    session_id: str
+    started_at: str
+    ended_at: str
+    duration_seconds: Optional[int] = None
+    frames_captured: int
+    items_added: List[Dict[str, Any]]
+    items_removed: List[Dict[str, Any]] = []
+    low_confidence_items: List[Dict[str, Any]] = []
+
+
+@router.post("/session-complete")
+async def receive_session_complete(
+    session: CaptureSessionComplete,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Receive complete capture session results from Raspberry Pi
+    
+    This is called when the door closes and Raspberry Pi has finished processing all frames.
+    It includes all detected items with their confidence scores.
+    
+    Flow:
+    1. Store capture session metadata
+    2. Classify each detected item (packaged vs fresh)
+    3. Store as pending items (waiting for voice input)
+    4. Trigger Google Home notification via IFTTT
+    5. Return summary
+    """
+    try:
+        from fridge_observer.supabase_client import get_supabase
+        from fridge_observer.ws_manager import manager
+        import os
+        import httpx
+        
+        sb = get_supabase()
+        logger.info(f"Received session complete: {session.session_id} with {len(session.items_added)} items")
+        
+        # Store capture session
+        session_data = {
+            "user_id": current_user["sub"],
+            "session_id": session.session_id,
+            "started_at": session.started_at,
+            "ended_at": session.ended_at,
+            "duration_seconds": session.duration_seconds,
+            "frames_captured": session.frames_captured,
+            "items_detected": len(session.items_added) + len(session.items_removed),
+            "items_added": len(session.items_added),
+            "items_removed": len(session.items_removed),
+            "status": "completed"
+        }
+        
+        sb.table("capture_sessions").insert(session_data).execute()
+        
+        # Process each detected item
+        pending_items = []
+        
+        for item in session.items_added:
+            name = item.get("name", "Unknown")
+            category = item.get("category", "packaged_goods")
+            confidence = item.get("confidence", 0.5)
+            
+            # Classify item
+            is_packaged, expiry_days = _classify_item(name, category)
+            
+            # Store as pending item
+            pending_data = {
+                "user_id": current_user["sub"],
+                "session_id": session.session_id,
+                "item_name": name,
+                "category": category,
+                "confidence": confidence,
+                "is_packaged": is_packaged,
+                "estimated_expiry_days": expiry_days,
+                "needs_quantity": True,  # Always ask for quantity
+                "needs_expiry_date": is_packaged,  # Only ask expiry for packaged items
+                "thumbnail": item.get("thumbnail")
+            }
+            
+            result = sb.table("pending_items").insert(pending_data).execute()
+            if result.data:
+                pending_items.append(result.data[0])
+        
+        # Broadcast WebSocket update
+        await manager.broadcast({
+            "type": "pending_items_added",
+            "count": len(pending_items),
+            "items": pending_items,
+            "session_id": session.session_id
+        })
+        
+        # Trigger Google Home notification via IFTTT
+        ifttt_key = os.getenv("IFTTT_WEBHOOK_KEY")
+        if ifttt_key and len(pending_items) > 0:
+            try:
+                item_names = ", ".join([item["item_name"] for item in pending_items[:3]])
+                if len(pending_items) > 3:
+                    item_names += f" and {len(pending_items) - 3} more"
+                
+                webhook_url = f"https://maker.ifttt.com/trigger/fridge_items_detected/with/key/{ifttt_key}"
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    await client.post(webhook_url, json={
+                        "value1": str(len(pending_items)),
+                        "value2": item_names,
+                        "value3": datetime.utcnow().isoformat()
+                    })
+                
+                logger.info(f"IFTTT notification sent for {len(pending_items)} items")
+            except Exception as e:
+                logger.warning(f"Failed to send IFTTT notification: {e}")
+        
+        return {
+            "status": "success",
+            "session_id": session.session_id,
+            "pending_items_created": len(pending_items),
+            "items_removed": len(session.items_removed),
+            "low_confidence_items": len(session.low_confidence_items),
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+    
+    except Exception as e:
+        logger.error(f"Error processing session complete: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
