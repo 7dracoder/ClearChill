@@ -35,10 +35,3 @@ picamera2==0.3.16; platform_machine == "armv7l" or platform_machine == "aarch64"
 # Testing
 pytest==7.4.4
 pytest-asyncio==0.23.3
-
-# Code Quality
-flake8==7.0.0
-black==24.1.1
-
-# CORS
-python-cors==1.0.0
