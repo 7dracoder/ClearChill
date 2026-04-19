@@ -217,7 +217,7 @@ async def generate_recipe_image(recipe_name: str, cuisine: str = "") -> Optional
 
 
 async def _generate_recipe_with_gemini(recipe_name: str, cuisine: str = "") -> Optional[bytes]:
-    """Generate food image using Gemini Imagen 4.0 Fast API."""
+    """Generate food image using Gemini Imagen 3.0 API."""
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
     if not gemini_key:
         return None
@@ -227,13 +227,19 @@ async def _generate_recipe_with_gemini(recipe_name: str, cuisine: str = "") -> O
         cuisine_hint = f"{cuisine} " if cuisine else ""
         prompt = f"Professional food photography of {cuisine_hint}{recipe_name}, beautifully plated, appetizing, high quality"
         
-        # Use Imagen 4.0 Fast for quick generation
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:generate?key={gemini_key}"
+        # Use Imagen 3.0 endpoint
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key={gemini_key}"
         
         payload = {
-            "prompt": prompt,
-            "number_of_images": 1,
-            "aspect_ratio": "4:3"
+            "instances": [
+                {
+                    "prompt": prompt
+                }
+            ],
+            "parameters": {
+                "sampleCount": 1,
+                "aspectRatio": "4:3"
+            }
         }
         
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -241,10 +247,10 @@ async def _generate_recipe_with_gemini(recipe_name: str, cuisine: str = "") -> O
             
             if response.status_code == 200:
                 data = response.json()
-                if "generatedImages" in data and len(data["generatedImages"]) > 0:
-                    image_b64 = data["generatedImages"][0]["image"]
+                if "predictions" in data and len(data["predictions"]) > 0:
+                    image_b64 = data["predictions"][0]["bytesBase64Encoded"]
                     image_bytes = base64.b64decode(image_b64)
-                    logger.info("✓ Gemini Imagen 4.0 generated: %d bytes for '%s'", len(image_bytes), recipe_name)
+                    logger.info("✓ Gemini Imagen 3.0 generated: %d bytes for '%s'", len(image_bytes), recipe_name)
                     return image_bytes
             else:
                 logger.warning("Gemini Imagen error: %d", response.status_code)
@@ -253,25 +259,6 @@ async def _generate_recipe_with_gemini(recipe_name: str, cuisine: str = "") -> O
         logger.warning("Gemini Imagen failed for '%s': %s", recipe_name, exc)
     
     return None
-    elif "noodle" in name_lower:
-        query = "noodles"
-    elif "sushi" in name_lower:
-        query = "sushi japanese"
-    elif "dessert" in name_lower or "cake" in name_lower:
-        query = "dessert cake"
-    else:
-        # Generic food photo with cuisine hint
-        query = f"{recipe_name.lower()}"
-        if cuisine:
-            query = f"{cuisine.lower()} {query}"
-    
-    # Try Unsplash first (more accurate)
-    result = await _fetch_unsplash_photo(query, 800, 600)
-    if result:
-        return result
-    
-    # Fallback to LoremFlickr if Unsplash fails
-    return await _fetch_photo(query, 512, 512)
 
 
 async def generate_food_item_image(item_name: str, category: str = "") -> Optional[bytes]:
@@ -396,13 +383,52 @@ async def generate_food_item_image(item_name: str, category: str = "") -> Option
 async def generate_blueprint_image(product_name: str, redesign_spec: str = "") -> Optional[bytes]:
     """
     Generate a sustainable product blueprint using AI services.
-    Priority: FAL.ai → Replicate → HF FLUX → Return None (use SVG)
+    Priority: Gemini Imagen 4.0 → FAL.ai → Replicate → HF FLUX → Return None (use SVG)
     {product_name.upper()}
     """
     # Build a comprehensive technical blueprint prompt
     prompt = f"A high-resolution, multi-panel technical blueprint illustration on an aged, blue textured grid-paper background with glowing cyan and green vector lines, detailing a comprehensive and sustainable product lifecycle schema for a {product_name.upper()}. The composition is structured as an interconnected circular economy infographic, with a prominent central diagram showing the {product_name.upper()} contained within a continuous 'CLOSED-LOOP CYCLE' flow arrow. Multiple dense callout labels with detailed, plausible technical specifications point directly to features like 'WEIGHT-OPTIMIZED LOGISTICS DESIGN,' 'NON-TOXIC SOLDER & ADHESIVES,' 'TRACEABLE MATERIAL QR-CODE TRACKER,' and 'MODULAR ASSEMBLY FOR REPAIR.' Encasing the central diagram are dedicated, labeled panels with icons: a top-right panel for 'RESPONSIBLE MATERIAL SOURCING' (e.g., regenerative agriculture, recycled polymers), a middle-right panel for 'CLEAN PRODUCTION & ENERGY STEWARDSHIP' (solar powered facilities, closed-loop water recycling), a bottom-right panel for 'REGIONAL LOGISTICS & REVERSE DISTRIBUTION' (electric fleet map), and a far-right panel for 'CONSUMER ENGAGEMENT & TAKE-BACK PROGRAM' (return kiosks, smartphone impact app). The entire blueprint has a professional schema look with dense data visualization and a prominent title box with a red 'CONFIDENTIAL' stamp."
     
     logger.info(f"Generating blueprint for '{product_name}' with detailed prompt")
+    
+    # Try Gemini Imagen 4.0 first (you have API key configured)
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
+    if gemini_key:
+        try:
+            logger.info("Attempting Gemini Imagen 4.0 blueprint generation...")
+            
+            # Use the correct Imagen 3 endpoint (Imagen 4.0 might not be available yet)
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key={gemini_key}"
+            
+            payload = {
+                "instances": [
+                    {
+                        "prompt": prompt
+                    }
+                ],
+                "parameters": {
+                    "sampleCount": 1,
+                    "aspectRatio": "16:9"
+                }
+            }
+            
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(url, json=payload)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if "predictions" in data and len(data["predictions"]) > 0:
+                        image_b64 = data["predictions"][0]["bytesBase64Encoded"]
+                        image_bytes = base64.b64decode(image_b64)
+                        logger.info("✓ Gemini Imagen 3.0 blueprint generated: %d bytes", len(image_bytes))
+                        return image_bytes
+                else:
+                    logger.warning("Gemini Imagen error: %d - %s", response.status_code, response.text[:200])
+        
+        except Exception as exc:
+            logger.warning("Gemini Imagen failed for '%s': %s", product_name, exc)
+    else:
+        logger.info("Gemini API key not configured - skipping")
     
     # Try FAL.ai first (FREE tier available!)
     if FAL_KEY and "your-fal" not in FAL_KEY.lower():
