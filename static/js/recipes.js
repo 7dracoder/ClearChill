@@ -25,30 +25,31 @@ async function _processImageQueue() {
     return;
   }
 
+  // Get placeholder before loading
+  const placeholder = imgEl.parentElement?.querySelector('.recipe-img-placeholder');
+
   try {
     const res = await fetch(url, { credentials: 'include' });
     if (res.ok) {
       const blob = await res.blob();
       imgEl.src = URL.createObjectURL(blob);
       imgEl.classList.add('loaded');
-      // Hide the loading placeholder
-      const placeholder = imgEl.parentElement?.querySelector('.recipe-img-placeholder');
-      if (placeholder) placeholder.style.display = 'none';
     } else {
+      console.warn('Recipe image failed to load:', url, res.status);
       imgEl.dispatchEvent(new Event('error'));
-      // Hide the loading placeholder on error too
-      const placeholder = imgEl.parentElement?.querySelector('.recipe-img-placeholder');
-      if (placeholder) placeholder.style.display = 'none';
     }
-  } catch {
+  } catch (err) {
+    console.error('Recipe image error:', url, err);
     imgEl.dispatchEvent(new Event('error'));
-    // Hide the loading placeholder on error
-    const placeholder = imgEl.parentElement?.querySelector('.recipe-img-placeholder');
-    if (placeholder) placeholder.style.display = 'none';
+  }
+  
+  // ALWAYS hide the loading placeholder after attempt
+  if (placeholder) {
+    placeholder.style.display = 'none';
   }
 
   // Small delay between requests to avoid rate limiting
-  await new Promise(r => setTimeout(r, 800));
+  await new Promise(r => setTimeout(r, 500));
   _processImageQueue();
 }
 

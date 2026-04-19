@@ -219,16 +219,23 @@ async def generate_recipe_image(recipe_name: str, cuisine: str = "") -> Optional
         else:
             query = f"{clean_name} food dish"
     
-    # Try Unsplash first (high quality)
+    # Try Unsplash first (high quality) - but it often returns 503
     result = await _fetch_unsplash_photo(query, 800, 600)
     if result:
         _image_cache[cache_key] = result  # Cache the result
+        logger.info("✓ Unsplash image for '%s'", recipe_name)
         return result
     
-    # Fallback to LoremFlickr
-    fallback = await _fetch_photo(query, 512, 512)
+    # Fallback to LoremFlickr with simpler, more focused query
+    # LoremFlickr works better with 1-2 keywords
+    simple_query = name_lower.split()[0] if name_lower else "food"
+    if cuisine:
+        simple_query = f"{cuisine.lower()},{simple_query}"
+    
+    fallback = await _fetch_photo(simple_query, 512, 512)
     if fallback:
         _image_cache[cache_key] = fallback  # Cache fallback too
+        logger.info("✓ LoremFlickr image for '%s' (query: %s)", recipe_name, simple_query)
     return fallback
 
 
