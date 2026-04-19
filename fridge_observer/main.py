@@ -58,7 +58,7 @@ def _is_valid_session(token: str | None) -> bool:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting Fridge Observer (Supabase backend)...")
+    logger.info("Starting BeenChilling (Supabase backend)...")
 
     # Initialize SQLite database (create tables if they don't exist)
     from fridge_observer.db import init_db
@@ -77,11 +77,11 @@ async def lifespan(app: FastAPI):
     logger.info("Recipes ready.")
 
     yield
-    logger.info("Shutting down Fridge Observer.")
+    logger.info("Shutting down BeenChilling.")
 
 
 app = FastAPI(
-    title="Fridge Observer",
+    title="BeenChilling",
     description="Smart fridge monitoring system API",
     version="2.0.0",
     lifespan=lifespan,
@@ -153,7 +153,7 @@ if STATIC_DIR.exists():
 else:
     @app.get("/")
     async def root():
-        return {"message": "Fridge Observer API running."}
+        return {"message": "BeenChilling API running."}
 
 
 if __name__ == "__main__":

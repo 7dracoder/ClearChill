@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": 400,
+    "message": "Invalid file specified.",
+    "status": "INVALID_ARGUMENT"
+  }
+}

@@ -1,0 +1,141 @@
+═══════════════════════════════════════════════════════════════
+  CLEARCHILL - DEPLOYMENT CHECKLIST
+═══════════════════════════════════════════════════════════════
+
+Use this checklist to track your deployment progress:
+
+┌─────────────────────────────────────────────────────────────┐
+│ PHASE 1: SUPABASE SETUP (Using existing "fridge" project)  │
+└─────────────────────────────────────────────────────────────┘
+
+[ ] 1. Go to https://supabase.com
+[ ] 2. Open your "fridge" project
+[ ] 3. Click "SQL Editor" → "New Query"
+[ ] 4. Copy all content from SUPABASE_SETUP.sql
+[ ] 5. Paste and click "Run"
+[ ] 6. Verify "Success" message (ignore "already exists" warnings)
+[ ] 7. Go to Settings → API
+[ ] 8. Copy Project URL
+[ ] 9. Copy anon public key
+[ ] 10. Copy service_role key
+
+┌─────────────────────────────────────────────────────────────┐
+│ PHASE 2: API KEYS                                           │
+└─────────────────────────────────────────────────────────────┘
+
+[ ] 11. Go to https://makersuite.google.com/app/apikey
+[ ] 12. Click "Create API Key"
+[ ] 13. Copy Gemini API key
+[ ] 14. Go to https://replicate.com
+[ ] 15. Sign in with GitHub
+[ ] 16. Go to Account → API Tokens
+[ ] 17. Copy Replicate token
+[ ] 18. Run: ./generate_secret_key.sh
+[ ] 19. Copy generated SECRET_KEY
+
+┌─────────────────────────────────────────────────────────────┐
+│ PHASE 3: RENDER.COM DEPLOYMENT                              │
+└─────────────────────────────────────────────────────────────┘
+
+[ ] 20. Go to https://render.com
+[ ] 21. Click "Get Started" (or login if you have account)
+[ ] 22. Sign in with GitHub
+[ ] 23. Click "New +" → "Web Service"
+[ ] 24. Find "7dracoder/ClearChill"
+[ ] 25. Click "Connect"
+[ ] 26. Name: clearchill
+[ ] 27. Region: Oregon (US West)
+[ ] 28. Branch: main
+[ ] 29. Runtime: Python 3
+[ ] 30. Build: pip install -r requirements.txt
+[ ] 31. Start: uvicorn fridge_observer.main:app --host 0.0.0.0 --port $PORT
+[ ] 32. Plan: Free
+[ ] 33. Add environment variable: SUPABASE_URL
+[ ] 34. Add environment variable: SUPABASE_KEY
+[ ] 35. Add environment variable: SUPABASE_SERVICE_KEY
+[ ] 36. Add environment variable: GEMINI_API_KEY
+[ ] 37. Add environment variable: REPLICATE_API_TOKEN
+[ ] 38. Add environment variable: SECRET_KEY
+[ ] 39. Add environment variable: HOST = 0.0.0.0
+[ ] 40. Add environment variable: ENVIRONMENT = production
+[ ] 41. Click "Create Web Service"
+[ ] 42. Wait 3-5 minutes for deployment
+[ ] 43. Watch logs for "Application startup complete"
+[ ] 44. Copy your Render URL
+
+┌─────────────────────────────────────────────────────────────┐
+│ PHASE 4: TESTING                                            │
+└─────────────────────────────────────────────────────────────┘
+
+[ ] 45. Open your Render URL in browser
+[ ] 46. Click "Sign Up"
+[ ] 47. Enter email and password
+[ ] 48. Check email for verification (check spam!)
+[ ] 49. Click verification link
+[ ] 50. Login with credentials
+[ ] 51. Click "Add Item" in inventory
+[ ] 52. Add test item (e.g., "Apple")
+[ ] 53. Verify item appears in inventory
+[ ] 54. Try AI Assistant chat
+[ ] 55. Check recipes page loads
+
+┌─────────────────────────────────────────────────────────────┐
+│ PHASE 5: RASPBERRY PI SETUP                                 │
+└─────────────────────────────────────────────────────────────┘
+
+[ ] 56. Login to deployed app
+[ ] 57. Press F12 (Developer Tools)
+[ ] 58. Go to Application → Cookies
+[ ] 59. Copy fridge_session value
+[ ] 60. SSH into Raspberry Pi
+[ ] 61. cd ~/ClearChill
+[ ] 62. nano .env
+[ ] 63. Update API_BASE_URL with Render URL
+[ ] 64. Update API_TOKEN with session token
+[ ] 65. Update WiFi credentials
+[ ] 66. Save and exit
+[ ] 67. Configure WiFi: sudo nano /etc/wpa_supplicant/wpa_supplicant.conf
+[ ] 68. Add eduroam network configuration
+[ ] 69. Save and exit
+[ ] 70. Restart WiFi: sudo systemctl restart wpa_supplicant
+[ ] 71. Test connection: ping google.com
+[ ] 72. Run: python raspberry_pi_sensor.py
+[ ] 73. Open fridge door
+[ ] 74. Watch logs for image capture
+[ ] 75. Check web app for new items
+
+┌─────────────────────────────────────────────────────────────┐
+│ PHASE 6: FINAL VERIFICATION                                 │
+└─────────────────────────────────────────────────────────────┘
+
+[ ] 76. Verify items appear in real-time
+[ ] 77. Check expiry dates are correct
+[ ] 78. Test AI recipe suggestions
+[ ] 79. Test sustainability blueprints
+[ ] 80. Verify notifications work
+[ ] 81. Test settings page
+[ ] 82. Invite family member to test
+[ ] 83. Monitor Render logs for errors
+[ ] 84. Check Supabase database has data
+[ ] 85. Celebrate! 🎉
+
+═══════════════════════════════════════════════════════════════
+
+✅ DEPLOYMENT COMPLETE!
+
+Your app is live at: https://clearchill.onrender.com
+Cost: ~$1-2/month (Replicate only)
+Status: Production ready
+
+═══════════════════════════════════════════════════════════════
+
+📞 TROUBLESHOOTING:
+
+If something doesn't work:
+1. Check Render logs: Dashboard → Logs
+2. Check Supabase logs: Dashboard → Logs
+3. Check browser console: F12 → Console
+4. Verify all environment variables are correct
+5. Make sure no trailing slashes in URLs
+
+═══════════════════════════════════════════════════════════════

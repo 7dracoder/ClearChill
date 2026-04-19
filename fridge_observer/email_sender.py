@@ -23,7 +23,7 @@ def send_email(to: str, subject: str, html_body: str, text_body: str = "") -> No
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = f"Fridge Observer <{EMAIL_FROM}>"
+    msg["From"] = f"BeenChilling <{EMAIL_FROM}>"
     msg["To"] = to
 
     if text_body:
@@ -41,7 +41,7 @@ def send_email(to: str, subject: str, html_body: str, text_body: str = "") -> No
 
 def send_otp_email(to: str, display_name: str, otp_code: str) -> None:
     """Send the OTP verification email."""
-    subject = f"{otp_code} is your Fridge Observer verification code"
+    subject = f"{otp_code} is your BeenChilling verification code"
 
     html_body = f"""
 <!DOCTYPE html>
@@ -60,7 +60,7 @@ def send_otp_email(to: str, display_name: str, otp_code: str) -> None:
           <tr>
             <td style="background:linear-gradient(135deg,#2d5a3d,#4A7C59);padding:32px;text-align:center;">
               <div style="font-size:40px;margin-bottom:8px;">❄️</div>
-              <h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:0;letter-spacing:-0.3px;">Fridge Observer</h1>
+              <h1 style="color:#ffffff;font-size:22px;font-weight:700;margin:0;letter-spacing:-0.3px;">BeenChilling</h1>
             </td>
           </tr>
 
@@ -69,7 +69,7 @@ def send_otp_email(to: str, display_name: str, otp_code: str) -> None:
             <td style="padding:36px 32px;">
               <p style="font-size:16px;color:#1A1A18;margin:0 0 8px;">Hi {display_name},</p>
               <p style="font-size:15px;color:#6B6860;line-height:1.6;margin:0 0 28px;">
-                Use the code below to verify your email address and complete your Fridge Observer sign up.
+                Use the code below to verify your email address and complete your BeenChilling sign up.
               </p>
 
               <!-- OTP Code -->
@@ -83,7 +83,7 @@ def send_otp_email(to: str, display_name: str, otp_code: str) -> None:
                 ⏰ This code expires in <strong>10 minutes</strong>.
               </p>
               <p style="font-size:13.5px;color:#A8A59E;line-height:1.6;margin:0;">
-                If you didn't create a Fridge Observer account, you can safely ignore this email.
+                If you didn't create a BeenChilling account, you can safely ignore this email.
               </p>
             </td>
           </tr>
@@ -92,7 +92,7 @@ def send_otp_email(to: str, display_name: str, otp_code: str) -> None:
           <tr>
             <td style="background:#F4F3EF;padding:20px 32px;text-align:center;border-top:1px solid #E8E6E0;">
               <p style="font-size:12px;color:#A8A59E;margin:0;">
-                Fridge Observer · Smart food tracking to reduce waste
+                BeenChilling · Smart food tracking to reduce waste
               </p>
             </td>
           </tr>
@@ -107,13 +107,13 @@ def send_otp_email(to: str, display_name: str, otp_code: str) -> None:
 
     text_body = f"""Hi {display_name},
 
-Your Fridge Observer verification code is:
+Your BeenChilling verification code is:
 
   {otp_code}
 
 This code expires in 10 minutes.
 
-If you didn't create a Fridge Observer account, ignore this email.
+If you didn't create a BeenChilling account, ignore this email.
 """
 
     send_email(to, subject, html_body, text_body)

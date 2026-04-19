@@ -1,0 +1,75 @@
+═══════════════════════════════════════════════════════════════
+  CLEARCHILL - ENVIRONMENT VARIABLES REFERENCE
+═══════════════════════════════════════════════════════════════
+
+Copy these 8 variables to Render.com when deploying:
+
+┌─────────────────────────────────────────────────────────────┐
+│ 1. SUPABASE_URL                                             │
+│    Example: https://xxxxx.supabase.co                       │
+│    Where: Supabase → Settings → API → Project URL          │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ 2. SUPABASE_KEY                                             │
+│    Example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...        │
+│    Where: Supabase → Settings → API → anon public          │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ 3. SUPABASE_SERVICE_KEY                                     │
+│    Example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...        │
+│    Where: Supabase → Settings → API → service_role         │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ 4. GEMINI_API_KEY                                           │
+│    Example: AIzaSyD...                                      │
+│    Where: https://makersuite.google.com/app/apikey          │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ 5. REPLICATE_API_TOKEN                                      │
+│    Example: r8_...                                          │
+│    Where: https://replicate.com → Account → API Tokens     │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ 6. SECRET_KEY                                               │
+│    Example: 64-character hex string                         │
+│    Generate: Run ./generate_secret_key.sh                   │
+│    Or: openssl rand -hex 32                                 │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ 7. HOST                                                     │
+│    Value: 0.0.0.0                                           │
+│    (Fixed value - no changes needed)                        │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│ 8. ENVIRONMENT                                              │
+│    Value: production                                        │
+│    (Fixed value - no changes needed)                        │
+└─────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════
+
+⚠️  IMPORTANT NOTES:
+
+• Don't include trailing slashes in URLs
+• Keep service_role key secret (never expose to frontend)
+• SECRET_KEY must be 64 characters (32 bytes in hex)
+• All keys are case-sensitive
+
+═══════════════════════════════════════════════════════════════
+
+📋 DEPLOYMENT ORDER:
+
+1. Create Supabase project → Get 3 keys
+2. Get Gemini API key → Free tier
+3. Get Replicate token → Pay-as-you-go
+4. Generate SECRET_KEY → Run script
+5. Add all 8 to Render.com → Deploy
+
+═══════════════════════════════════════════════════════════════
