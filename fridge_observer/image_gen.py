@@ -134,90 +134,47 @@ async def _hf_generate(prompt: str, width: int, height: int, steps: int = 4) -> 
 # ── Public API ────────────────────────────────────────────────
 
 async def generate_recipe_image(recipe_name: str, cuisine: str = "") -> Optional[bytes]:
-    """Get accurate food photo for a recipe - uses Unsplash for fast, relevant images."""
+    """Get accurate food photo for a recipe - extracts key ingredients for better matching."""
     # Check cache first
     cache_key = _cache_key("recipe", recipe_name, cuisine)
     if cache_key in _image_cache:
         logger.info("✓ Using cached image for '%s'", recipe_name)
         return _image_cache[cache_key]
     
-    # Use Unsplash directly for fast, relevant images (skip slow Gemini for recipes)
-    name_lower = recipe_name.lower()
+    name_lower = recipe_name.lower().strip()
     
-    # Comprehensive recipe name mapping for accurate images
-    recipe_map = {
-        # Breakfast
-        "omelette": "omelette eggs breakfast", "omelet": "omelette eggs breakfast",
-        "pancakes": "pancakes stack breakfast", "waffles": "waffles breakfast",
-        "french toast": "french toast breakfast", "scrambled eggs": "scrambled eggs",
-        "eggs benedict": "eggs benedict hollandaise", "breakfast burrito": "breakfast burrito",
-        
-        # Pasta & Italian
-        "pasta carbonara": "pasta carbonara creamy", "spaghetti bolognese": "spaghetti bolognese",
-        "lasagna": "lasagna italian", "fettuccine alfredo": "fettuccine alfredo",
-        "penne arrabbiata": "penne arrabbiata", "pasta primavera": "pasta vegetables",
-        "ravioli": "ravioli pasta", "gnocchi": "gnocchi italian",
-        
-        # Asian
-        "stir fry": "stir fry wok vegetables", "fried rice": "fried rice asian",
-        "pad thai": "pad thai noodles", "ramen": "ramen bowl noodles",
-        "sushi": "sushi platter", "curry": "curry rice indian",
-        "chicken tikka masala": "chicken tikka masala", "pho": "pho vietnamese soup",
-        "dumplings": "dumplings asian", "spring rolls": "spring rolls",
-        
-        # Mexican
-        "tacos": "tacos mexican", "burrito": "burrito mexican",
-        "quesadilla": "quesadilla cheese", "enchiladas": "enchiladas mexican",
-        "nachos": "nachos cheese", "fajitas": "fajitas sizzling",
-        
-        # American
-        "burger": "burger gourmet", "cheeseburger": "cheeseburger",
-        "hot dog": "hot dog", "bbq ribs": "bbq ribs",
-        "mac and cheese": "mac cheese creamy", "fried chicken": "fried chicken crispy",
-        "pizza": "pizza slice", "sandwich": "sandwich deli",
-        
-        # Seafood
-        "salmon": "grilled salmon fish", "fish and chips": "fish chips",
-        "shrimp scampi": "shrimp scampi", "lobster": "lobster seafood",
-        "crab cakes": "crab cakes", "tuna steak": "tuna steak grilled",
-        
-        # Meat
-        "steak": "steak grilled beef", "beef stew": "beef stew",
-        "chicken breast": "chicken breast grilled", "roast chicken": "roast chicken",
-        "pork chops": "pork chops", "lamb chops": "lamb chops grilled",
-        "meatballs": "meatballs sauce", "pot roast": "pot roast beef",
-        
-        # Soups & Salads
-        "soup": "soup bowl hot", "chicken soup": "chicken soup",
-        "tomato soup": "tomato soup", "minestrone": "minestrone soup",
-        "caesar salad": "caesar salad", "greek salad": "greek salad",
-        "cobb salad": "cobb salad", "garden salad": "salad fresh",
-        
-        # Desserts
-        "chocolate cake": "chocolate cake slice", "cheesecake": "cheesecake slice",
-        "brownies": "brownies chocolate", "cookies": "cookies chocolate chip",
-        "ice cream": "ice cream scoop", "tiramisu": "tiramisu dessert",
-        "apple pie": "apple pie slice", "cupcakes": "cupcakes frosting",
-    }
+    # Extract key food words from recipe name for better image matching
+    food_keywords = [
+        "apple", "banana", "orange", "strawberry", "blueberry", "mango", "pineapple", "lemon",
+        "chicken", "beef", "pork", "fish", "salmon", "tuna", "shrimp", "turkey", "lamb",
+        "pasta", "spaghetti", "noodles", "rice", "bread", "pizza", "burger", "sandwich",
+        "salad", "soup", "stew", "curry", "stir-fry", "roast", "grilled", "baked", "fried",
+        "egg", "omelette", "scrambled",
+        "cheese", "yogurt", "milk",
+        "tomato", "potato", "carrot", "broccoli", "spinach", "mushroom", "onion", "pepper",
+        "chocolate", "cake", "cookie", "pie", "smoothie", "juice", "pancake", "waffle",
+        "taco", "burrito", "quesadilla", "enchilada", "fajita",
+        "ramen", "sushi", "dumpling", "spring roll",
+    ]
     
-    # Try exact match first
-    query = recipe_map.get(name_lower)
+    # Find food keywords in the recipe name
+    found_keywords = []
+    for keyword in food_keywords:
+        if keyword in name_lower:
+            found_keywords.append(keyword)
     
-    # If no exact match, try partial matches
-    if not query:
-        for key, value in recipe_map.items():
-            if key in name_lower or name_lower in key:
-                query = value
-                break
+    # Build search query based on found keywords
+    if found_keywords:
+        # Use the first 2 most relevant keywords
+        query = " ".join(found_keywords[:2])
+    else:
+        # Fallback: use first 2 words of recipe name
+        words = name_lower.split()
+        query = " ".join(words[:2]) if len(words) >= 2 else name_lower
     
-    # If still no match, build from name and cuisine
-    if not query:
-        # Clean up the recipe name
-        clean_name = name_lower.replace("_", " ").replace("-", " ")
-        if cuisine:
-            query = f"{cuisine.lower()} {clean_name} food"
-        else:
-            query = f"{clean_name} food dish"
+    # Add cuisine if provided
+    if cuisine:
+        query = f"{cuisine.lower()} {query}"
     
     # Try Unsplash first (high quality) - but it often returns 503
     result = await _fetch_unsplash_photo(query, 800, 600)
