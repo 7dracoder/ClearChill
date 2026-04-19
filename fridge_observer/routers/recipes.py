@@ -46,6 +46,147 @@ def _compute_urgency_score(ingredients, inventory, threshold):
     return score, matching
 
 
+async def _generate_recipes_with_k2(inventory: list[dict], dietary: str = None, cuisine: str = None, max_prep: int = None) -> list[ScoredRecipe]:
+    """Generate recipes dynamically using K2-Think based on inventory."""
+    import json as _json
+    from fridge_observer.ai_client import k2_chat, ANSWER_SEP
+    
+    # Build inventory description
+    urgent_items = [item for item in inventory if item["days_until_expiry"] is not None and item["days_until_expiry"] <= 3]
+    all_items = [item["name"] for item in inventory]
+    
+    filters_text = []
+    if dietary:
+        filters_text.append(f"dietary preference: {dietary}")
+    if cuisine:
+        filters_text.append(f"cuisine: {cuisine}")
+    if max_prep:
+        filters_text.append(f"max prep time: {max_prep} minutes")
+    
+    filters_str = ", ".join(filters_text) if filters_text else "no specific filters"
+    
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a professional chef creating recipes based on available ingredients. "
+                "Prioritize using items that are expiring soon. "
+                "Always respond with ONLY valid JSON after the separator — no extra text.\n\n"
+                f"FORMAT: {ANSWER_SEP}\n{{...}}"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Available ingredients: {', '.join(all_items)}\n"
+                f"Items expiring soon (use these first): {', '.join([i['name'] for i in urgent_items]) if urgent_items else 'none'}\n"
+                f"Filters: {filters_str}\n\n"
+                "Generate 5-8 creative recipes using these ingredients. "
+                "Each recipe should use at least one available ingredient. "
+                "Prioritize recipes that use expiring items.\n\n"
+                "Return JSON array with this structure:\n"
+                "[\n"
+                "  {\n"
+                '    "name": "Recipe Name",\n'
+                '    "description": "Brief description",\n'
+                '    "cuisine": "Cuisine type",\n'
+                '    "dietary_tags": ["vegetarian", "gluten-free"],\n'
+                '    "prep_minutes": 15,\n'
+                '    "ingredients": ["ingredient1", "ingredient2"],\n'
+                '    "instructions": "Step 1. Do this. Step 2. Do that."\n'
+                "  }\n"
+                "]\n\n"
+                "Make recipes practical and delicious!"
+            ),
+        },
+    ]
+    
+    try:
+        response = await k2_chat(messages, stream=False)
+        
+        # Extract JSON
+        if ANSWER_SEP in response:
+            json_str = response.rsplit(ANSWER_SEP, 1)[1].strip()
+        else:
+            import re
+            match = re.search(r'\[[\s\S]*\]', response)
+            json_str = match.group(0) if match else "[]"
+        
+        # Clean markdown fences
+        if "```" in json_str:
+            parts = json_str.split("```")
+            for part in parts:
+                part = part.strip()
+                if part.startswith("json"):
+                    part = part[4:].strip()
+                if part.startswith("["):
+                    json_str = part
+                    break
+        
+        recipes_data = _json.loads(json_str.strip())
+        
+        if not isinstance(recipes_data, list):
+            recipes_data = []
+        
+        # Convert to ScoredRecipe objects
+        scored_recipes = []
+        inv_by_name = {item["name"].lower(): item for item in inventory}
+        
+        for idx, r in enumerate(recipes_data):
+            # Calculate urgency score based on which ingredients are used
+            score = 0.0
+            matching = []
+            recipe_ingredients = r.get("ingredients", [])
+            
+            for ing_name in recipe_ingredients:
+                inv_item = inv_by_name.get(ing_name.lower())
+                if inv_item and inv_item["days_until_expiry"] is not None:
+                    days = inv_item["days_until_expiry"]
+                    if days <= 0:
+                        score += 1.0
+                        matching.append(ing_name)
+                    elif days <= 3:
+                        score += (3 - days) / 3
+                        matching.append(ing_name)
+            
+            # Create recipe object
+            recipe_obj = Recipe(
+                id=-(idx + 1),  # Negative IDs for generated recipes
+                name=r.get("name", "Unnamed Recipe"),
+                description=r.get("description"),
+                cuisine=r.get("cuisine"),
+                dietary_tags=r.get("dietary_tags", []),
+                prep_minutes=r.get("prep_minutes", 30),
+                instructions=r.get("instructions", ""),
+                image_url=None,
+                ingredients=[
+                    RecipeIngredient(
+                        id=-(idx * 100 + i),
+                        recipe_id=-(idx + 1),
+                        name=ing,
+                        category=None,
+                        is_pantry_staple=False,
+                    )
+                    for i, ing in enumerate(recipe_ingredients)
+                ],
+                is_favorite=False,
+            )
+            
+            scored_recipes.append(ScoredRecipe(
+                recipe=recipe_obj,
+                urgency_score=score,
+                matching_expiring_items=matching,
+            ))
+        
+        # Sort by urgency score
+        scored_recipes.sort(key=lambda x: x.urgency_score, reverse=True)
+        return scored_recipes
+        
+    except Exception as exc:
+        logger.error("K2 recipe generation failed: %s", exc)
+        return []
+
+
 @router.get("", response_model=list[ScoredRecipe])
 async def get_recipes(
     dietary: Optional[str] = Query(None),
@@ -54,71 +195,42 @@ async def get_recipes(
     favorites_only: bool = Query(False),
     current_user: dict = Depends(get_current_user),
 ):
+    """Generate recipes dynamically using K2-Think based on fridge inventory."""
     settings = get_settings()
     threshold = settings.spoilage_threshold_fruits
     sb = get_supabase()
 
-    # Get inventory
+    # Get inventory with expiry dates
     inv_result = sb.table("food_items").select("name, category, expiry_date").eq("user_id", current_user["sub"]).execute()
     inventory = inv_result.data or []
 
-    # Get favorites
-    fav_result = sb.table("recipe_favorites").select("recipe_id").eq("user_id", current_user["sub"]).execute()
-    fav_ids = {r["recipe_id"] for r in (fav_result.data or [])}
+    if not inventory:
+        return []
 
-    # Build recipe query
-    query = sb.table("recipes").select("*, recipe_ingredients(*)")
-    if cuisine:
-        query = query.ilike("cuisine", cuisine)
-    if max_prep_minutes:
-        query = query.lte("prep_minutes", max_prep_minutes)
-    if favorites_only:
-        if not fav_ids:
-            return []
-        query = query.in_("id", list(fav_ids))
+    # Sort inventory by expiry date (most urgent first)
+    today = date.today()
+    inventory_with_urgency = []
+    for item in inventory:
+        days_until_expiry = None
+        if item.get("expiry_date"):
+            try:
+                expiry = date.fromisoformat(item["expiry_date"][:10])
+                days_until_expiry = (expiry - today).days
+            except Exception:
+                pass
+        inventory_with_urgency.append({
+            "name": item["name"],
+            "category": item.get("category", ""),
+            "days_until_expiry": days_until_expiry,
+        })
+    
+    # Sort by urgency (expired/expiring soon first)
+    inventory_with_urgency.sort(key=lambda x: (x["days_until_expiry"] is None, x["days_until_expiry"] if x["days_until_expiry"] is not None else 999))
 
-    result = query.execute()
-    recipes_data = result.data or []
-
-    scored = []
-    for r in recipes_data:
-        tags = r.get("dietary_tags") or []
-        if isinstance(tags, str):
-            import json
-            try: tags = json.loads(tags)
-            except: tags = []
-
-        if dietary and dietary.lower() not in [t.lower() for t in tags]:
-            continue
-
-        ingredients = r.get("recipe_ingredients") or []
-        score, matching = _compute_urgency_score(ingredients, inventory, threshold)
-
-        recipe_obj = Recipe(
-            id=r["id"],
-            name=r["name"],
-            description=r.get("description"),
-            cuisine=r.get("cuisine"),
-            dietary_tags=tags,
-            prep_minutes=r.get("prep_minutes"),
-            instructions=r["instructions"],
-            image_url=r.get("image_url"),
-            ingredients=[
-                RecipeIngredient(
-                    id=i["id"],
-                    recipe_id=i["recipe_id"],
-                    name=i["name"],
-                    category=i.get("category"),
-                    is_pantry_staple=bool(i.get("is_pantry_staple", False)),
-                )
-                for i in ingredients
-            ],
-            is_favorite=r["id"] in fav_ids,
-        )
-        scored.append(ScoredRecipe(recipe=recipe_obj, urgency_score=score, matching_expiring_items=matching))
-
-    scored.sort(key=lambda x: x.urgency_score, reverse=True)
-    return scored
+    # Generate recipes using K2-Think
+    recipes = await _generate_recipes_with_k2(inventory_with_urgency, dietary, cuisine, max_prep_minutes)
+    
+    return recipes
 
 
 @router.post("/{recipe_id}/favorite", status_code=201)
@@ -175,11 +287,104 @@ async def made_this(recipe_id: int, current_user: dict = Depends(get_current_use
 @router.get("/{recipe_id}/detail")
 async def get_recipe_detail(recipe_id: int, current_user: dict = Depends(get_current_user)):
     """
-    Get full recipe detail. Uses K2-Think to generate complete structured recipe
-    with quantities, measurements, and step-by-step instructions.
+    Get full recipe detail. For generated recipes (negative IDs), regenerate with K2.
+    For stored recipes, fetch from database and enhance with K2.
     """
     sb = get_supabase()
 
+    # Check if this is a generated recipe (negative ID)
+    if recipe_id < 0:
+        # Regenerate the recipe list and find this one
+        inv_result = sb.table("food_items").select("name, category, expiry_date").eq("user_id", current_user["sub"]).execute()
+        inventory = inv_result.data or []
+        
+        if not inventory:
+            raise HTTPException(status_code=404, detail="Recipe not found")
+        
+        # Prepare inventory with urgency
+        today = date.today()
+        inventory_with_urgency = []
+        for item in inventory:
+            days_until_expiry = None
+            if item.get("expiry_date"):
+                try:
+                    expiry = date.fromisoformat(item["expiry_date"][:10])
+                    days_until_expiry = (expiry - today).days
+                except Exception:
+                    pass
+            inventory_with_urgency.append({
+                "name": item["name"],
+                "category": item.get("category", ""),
+                "days_until_expiry": days_until_expiry,
+            })
+        
+        inventory_with_urgency.sort(key=lambda x: (x["days_until_expiry"] is None, x["days_until_expiry"] if x["days_until_expiry"] is not None else 999))
+        
+        # Generate recipes
+        recipes = await _generate_recipes_with_k2(inventory_with_urgency)
+        
+        # Find the requested recipe by ID
+        recipe_idx = abs(recipe_id) - 1
+        if recipe_idx >= len(recipes):
+            raise HTTPException(status_code=404, detail="Recipe not found")
+        
+        scored_recipe = recipes[recipe_idx]
+        r = scored_recipe.recipe
+        
+        # Generate full details with K2
+        full_recipe = await _generate_full_recipe_with_k2(
+            name=r.name,
+            description=r.description or "",
+            cuisine=r.cuisine or "",
+            prep_minutes=r.prep_minutes,
+            ingredients=[{"name": ing.name, "category": ing.category, "is_pantry_staple": ing.is_pantry_staple} for ing in r.ingredients],
+            raw_instructions=r.instructions,
+        )
+        
+        # Mark which ingredients are in fridge
+        inv_map = {item["name"].lower(): item for item in inventory}
+        enriched_ingredients = []
+        for ing in r.ingredients:
+            inv_item = inv_map.get(ing.name.lower())
+            days = None
+            if inv_item and inv_item.get("expiry_date"):
+                try:
+                    expiry = date.fromisoformat(inv_item["expiry_date"][:10])
+                    days = (expiry - today).days
+                except Exception:
+                    pass
+            
+            status = "ok"
+            if days is not None:
+                if days <= 0:
+                    status = "expired"
+                elif days <= 3:
+                    status = "warning"
+            
+            enriched_ingredients.append({
+                "name": ing.name,
+                "category": ing.category,
+                "is_pantry_staple": ing.is_pantry_staple,
+                "in_fridge": inv_item is not None,
+                "expiry_status": status if inv_item else None,
+            })
+        
+        return {
+            "id": recipe_id,
+            "name": r.name,
+            "description": r.description,
+            "cuisine": r.cuisine,
+            "dietary_tags": r.dietary_tags,
+            "prep_minutes": r.prep_minutes,
+            "servings": full_recipe.get("servings", 2),
+            "ingredients": enriched_ingredients,
+            "quantities": full_recipe.get("quantities", {}),
+            "steps": full_recipe.get("steps", []),
+            "tips": full_recipe.get("tips", ""),
+            "image_url": r.image_url,
+        }
+
+    # Original stored recipe logic
     recipe = sb.table("recipes").select("*, recipe_ingredients(*)").eq("id", recipe_id).single().execute()
     if not recipe.data:
         raise HTTPException(status_code=404, detail="Recipe not found")
