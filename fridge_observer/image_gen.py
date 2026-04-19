@@ -9,6 +9,8 @@ import io
 import logging
 import os
 from typing import Optional
+from functools import lru_cache
+import hashlib
 
 import httpx
 
@@ -22,11 +24,20 @@ REPLICATE_API_TOKEN = os.environ.get("REPLICATE_API_TOKEN", "")
 FAL_KEY = os.environ.get("FAL_KEY", "")
 _hf_credits_depleted = False
 
+# Simple in-memory cache for generated images
+_image_cache = {}
+
 HF_MODELS = [
     "black-forest-labs/FLUX.1-schnell",
     "black-forest-labs/FLUX.1-dev",
     "stabilityai/stable-diffusion-xl-base-1.0",
 ]
+
+
+def _cache_key(prefix: str, *args) -> str:
+    """Generate a cache key from arguments."""
+    key_str = f"{prefix}:{':'.join(str(a) for a in args)}"
+    return hashlib.md5(key_str.encode()).hexdigest()
 
 
 # ── LoremFlickr (free, keyword-based photos) ─────────────────
@@ -123,11 +134,26 @@ async def _hf_generate(prompt: str, width: int, height: int, steps: int = 4) -> 
 # ── Public API ────────────────────────────────────────────────
 
 async def generate_recipe_image(recipe_name: str, cuisine: str = "") -> Optional[bytes]:
-    """Get accurate food photo for a recipe - tries Gemini Imagen 4.0 first, then Unsplash."""
-    # Try Gemini Imagen 4.0 first for AI-generated images
-    gemini_image = await _generate_recipe_with_gemini(recipe_name, cuisine)
-    if gemini_image:
-        return gemini_image
+    """Get accurate food photo for a recipe - tries Gemini Imagen first with caching, then Unsplash."""
+    # Check cache first
+    cache_key = _cache_key("recipe", recipe_name, cuisine)
+    if cache_key in _image_cache:
+        logger.info("✓ Using cached image for '%s'", recipe_name)
+        return _image_cache[cache_key]
+    
+    # Try Gemini Imagen first for AI-generated images (but don't wait too long)
+    try:
+        gemini_image = await asyncio.wait_for(
+            _generate_recipe_with_gemini(recipe_name, cuisine),
+            timeout=5.0  # Only wait 5 seconds for Gemini
+        )
+        if gemini_image:
+            _image_cache[cache_key] = gemini_image
+            return gemini_image
+    except asyncio.TimeoutError:
+        logger.warning("Gemini Imagen timeout for '%s' - falling back to Unsplash", recipe_name)
+    except Exception as exc:
+        logger.warning("Gemini Imagen error for '%s': %s - falling back", recipe_name, exc)
     
     # Fallback to Unsplash with improved mapping
     name_lower = recipe_name.lower()
@@ -391,9 +417,14 @@ async def generate_food_item_image(item_name: str, category: str = "") -> Option
 async def generate_blueprint_image(product_name: str, redesign_spec: str = "") -> Optional[bytes]:
     """
     Generate a sustainable product blueprint using AI services.
-    Priority: Gemini Imagen 4.0 → FAL.ai → Replicate → HF FLUX → Return None (use SVG)
-    {product_name.upper()}
+    Priority: Gemini Imagen → FAL.ai → Replicate → HF FLUX → Return None (use SVG)
     """
+    # Check cache first
+    cache_key = _cache_key("blueprint", product_name, redesign_spec)
+    if cache_key in _image_cache:
+        logger.info("✓ Using cached blueprint for '%s'", product_name)
+        return _image_cache[cache_key]
+    
     # Build a comprehensive technical blueprint prompt
     prompt = f"A high-resolution, multi-panel technical blueprint illustration on an aged, blue textured grid-paper background with glowing cyan and green vector lines, detailing a comprehensive and sustainable product lifecycle schema for a {product_name.upper()}. The composition is structured as an interconnected circular economy infographic, with a prominent central diagram showing the {product_name.upper()} contained within a continuous 'CLOSED-LOOP CYCLE' flow arrow. Multiple dense callout labels with detailed, plausible technical specifications point directly to features like 'WEIGHT-OPTIMIZED LOGISTICS DESIGN,' 'NON-TOXIC SOLDER & ADHESIVES,' 'TRACEABLE MATERIAL QR-CODE TRACKER,' and 'MODULAR ASSEMBLY FOR REPAIR.' Encasing the central diagram are dedicated, labeled panels with icons: a top-right panel for 'RESPONSIBLE MATERIAL SOURCING' (e.g., regenerative agriculture, recycled polymers), a middle-right panel for 'CLEAN PRODUCTION & ENERGY STEWARDSHIP' (solar powered facilities, closed-loop water recycling), a bottom-right panel for 'REGIONAL LOGISTICS & REVERSE DISTRIBUTION' (electric fleet map), and a far-right panel for 'CONSUMER ENGAGEMENT & TAKE-BACK PROGRAM' (return kiosks, smartphone impact app). The entire blueprint has a professional schema look with dense data visualization and a prominent title box with a red 'CONFIDENTIAL' stamp."
     
@@ -433,6 +464,7 @@ async def generate_blueprint_image(product_name: str, redesign_spec: str = "") -
                     if "predictions" in data and len(data["predictions"]) > 0:
                         image_b64 = data["predictions"][0]["bytesBase64Encoded"]
                         image_bytes = base64.b64decode(image_b64)
+                        _image_cache[cache_key] = image_bytes  # Cache the result
                         logger.info("✓ Gemini Imagen blueprint generated: %d bytes", len(image_bytes))
                         return image_bytes
                     else:
