@@ -143,38 +143,37 @@ async def generate_recipe_image(recipe_name: str, cuisine: str = "") -> Optional
     
     name_lower = recipe_name.lower().strip()
     
-    # Extract key food words from recipe name for better image matching
-    food_keywords = [
-        "apple", "banana", "orange", "strawberry", "blueberry", "mango", "pineapple", "lemon",
-        "chicken", "beef", "pork", "fish", "salmon", "tuna", "shrimp", "turkey", "lamb",
-        "pasta", "spaghetti", "noodles", "rice", "bread", "pizza", "burger", "sandwich",
-        "salad", "soup", "stew", "curry", "stir-fry", "roast", "grilled", "baked", "fried",
-        "egg", "omelette", "scrambled",
-        "cheese", "yogurt", "milk",
-        "tomato", "potato", "carrot", "broccoli", "spinach", "mushroom", "onion", "pepper",
-        "chocolate", "cake", "cookie", "pie", "smoothie", "juice", "pancake", "waffle",
-        "taco", "burrito", "quesadilla", "enchilada", "fajita",
-        "ramen", "sushi", "dumpling", "spring roll",
-    ]
+    # Priority food keywords (most specific first)
+    primary_foods = {
+        "apple": "apple", "banana": "banana", "orange": "orange", "strawberry": "strawberry",
+        "blueberry": "blueberry", "mango": "mango", "pineapple": "pineapple", "lemon": "lemon",
+        "chicken": "chicken", "beef": "beef", "pork": "pork", "salmon": "salmon", 
+        "fish": "fish", "tuna": "tuna", "shrimp": "shrimp", "turkey": "turkey",
+        "pasta": "pasta", "spaghetti": "spaghetti", "noodle": "noodles", "rice": "rice",
+        "pizza": "pizza", "burger": "burger", "sandwich": "sandwich",
+        "salad": "salad", "soup": "soup", "curry": "curry", "stir": "stirfry",
+        "egg": "eggs", "omelette": "omelette", "scrambled": "scrambled eggs",
+        "taco": "tacos", "burrito": "burrito", "quesadilla": "quesadilla",
+        "ramen": "ramen", "sushi": "sushi", "dumpling": "dumplings",
+        "pancake": "pancakes", "waffle": "waffles", "toast": "toast",
+        "cheese": "cheese", "tomato": "tomato", "potato": "potato",
+        "broccoli": "broccoli", "spinach": "spinach", "mushroom": "mushrooms",
+        "chocolate": "chocolate", "cake": "cake", "cookie": "cookies", "pie": "pie",
+    }
     
-    # Find food keywords in the recipe name
-    found_keywords = []
-    for keyword in food_keywords:
-        if keyword in name_lower:
-            found_keywords.append(keyword)
+    # Find the FIRST matching primary food (most important ingredient)
+    main_ingredient = None
+    for key, value in primary_foods.items():
+        if key in name_lower:
+            main_ingredient = value
+            break
     
-    # Build search query based on found keywords
-    if found_keywords:
-        # Use the first 2 most relevant keywords
-        query = " ".join(found_keywords[:2])
+    # Build simple, focused query (Unsplash works best with 1-2 words)
+    if main_ingredient:
+        query = main_ingredient
     else:
-        # Fallback: use first 2 words of recipe name
-        words = name_lower.split()
-        query = " ".join(words[:2]) if len(words) >= 2 else name_lower
-    
-    # Add cuisine if provided
-    if cuisine:
-        query = f"{cuisine.lower()} {query}"
+        # Fallback: use first word of recipe name
+        query = name_lower.split()[0] if name_lower else "food"
     
     # Try Unsplash first (high quality) - but it often returns 503
     result = await _fetch_unsplash_photo(query, 800, 600)
