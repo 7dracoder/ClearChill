@@ -123,7 +123,13 @@ async def _hf_generate(prompt: str, width: int, height: int, steps: int = 4) -> 
 # ── Public API ────────────────────────────────────────────────
 
 async def generate_recipe_image(recipe_name: str, cuisine: str = "") -> Optional[bytes]:
-    """Get accurate food photo for a recipe using improved Unsplash search."""
+    """Get accurate food photo for a recipe - tries Gemini Imagen 4.0 first, then Unsplash."""
+    # Try Gemini Imagen 4.0 first for AI-generated images
+    gemini_image = await _generate_recipe_with_gemini(recipe_name, cuisine)
+    if gemini_image:
+        return gemini_image
+    
+    # Fallback to Unsplash with improved mapping
     name_lower = recipe_name.lower()
     
     # Comprehensive recipe name mapping for accurate images
@@ -208,6 +214,45 @@ async def generate_recipe_image(recipe_name: str, cuisine: str = "") -> Optional
     
     # Fallback to LoremFlickr
     return await _fetch_photo(query, 512, 512)
+
+
+async def _generate_recipe_with_gemini(recipe_name: str, cuisine: str = "") -> Optional[bytes]:
+    """Generate food image using Gemini Imagen 4.0 Fast API."""
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
+    if not gemini_key:
+        return None
+    
+    try:
+        # Build food photography prompt
+        cuisine_hint = f"{cuisine} " if cuisine else ""
+        prompt = f"Professional food photography of {cuisine_hint}{recipe_name}, beautifully plated, appetizing, high quality"
+        
+        # Use Imagen 4.0 Fast for quick generation
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:generate?key={gemini_key}"
+        
+        payload = {
+            "prompt": prompt,
+            "number_of_images": 1,
+            "aspect_ratio": "4:3"
+        }
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, json=payload)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if "generatedImages" in data and len(data["generatedImages"]) > 0:
+                    image_b64 = data["generatedImages"][0]["image"]
+                    image_bytes = base64.b64decode(image_b64)
+                    logger.info("✓ Gemini Imagen 4.0 generated: %d bytes for '%s'", len(image_bytes), recipe_name)
+                    return image_bytes
+            else:
+                logger.warning("Gemini Imagen error: %d", response.status_code)
+    
+    except Exception as exc:
+        logger.warning("Gemini Imagen failed for '%s': %s", recipe_name, exc)
+    
+    return None
     elif "noodle" in name_lower:
         query = "noodles"
     elif "sushi" in name_lower:
