@@ -208,28 +208,18 @@ def _send_otp_email_async(email: str, display_name: str, code: str) -> None:
 
 @router.post("/signup", status_code=201)
 async def signup(body: SignupRequest):
-    """
-    Create account in Supabase Auth (email confirmation disabled).
-    Send our own 6-digit OTP via Gmail.
-    """
     sb = get_supabase()
 
     # Check if user already exists
     try:
-        # Try to sign in — if it works, user exists
         existing = sb.auth.admin.list_users()
         existing_emails = [u.email for u in existing if u.email]
         if body.email in existing_emails:
-            # Check if already confirmed
             for u in existing:
                 if u.email == body.email:
                     if u.email_confirmed_at:
-                        raise HTTPException(
-                            status_code=409,
-                            detail="An account with this email already exists"
-                        )
+                        raise HTTPException(status_code=409, detail="An account with this email already exists")
                     else:
-                        # Resend OTP for unconfirmed account
                         code = _generate_otp()
                         _store_otp(body.email, code)
                         _send_otp_email_async(body.email, body.display_name, code)
@@ -241,21 +231,19 @@ async def signup(body: SignupRequest):
                         }
     except HTTPException:
         raise
-    except Exception:
-        pass  # List users might fail, proceed with signup
+    except Exception as exc:
+        logger.warning("list_users check failed (non-fatal): %s", exc)
 
-    # Create user with email confirmation disabled via admin API
+    # Create user
     try:
         result = sb.auth.admin.create_user({
             "email": body.email,
             "password": body.password,
             "user_metadata": {"display_name": body.display_name},
-            "email_confirm": False,  # We handle confirmation ourselves
+            "email_confirm": False,
         })
-
         if not result.user:
             raise HTTPException(status_code=400, detail="Signup failed. Please try again.")
-
     except HTTPException:
         raise
     except Exception as exc:
