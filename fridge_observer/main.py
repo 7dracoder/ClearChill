@@ -144,6 +144,11 @@ if STATIC_DIR.exists():
             return RedirectResponse(url="/", status_code=302)
         return FileResponse(str(STATIC_DIR / "login.html"))
 
+    @app.get("/monitor.html")
+    async def serve_monitor():
+        """Monitoring dashboard - no auth required for easy access"""
+        return FileResponse(str(STATIC_DIR / "monitor.html"))
+
     @app.get("/signup")
     async def serve_signup(fridge_session: str = Cookie(default=None)):
         if _is_valid_session(fridge_session):

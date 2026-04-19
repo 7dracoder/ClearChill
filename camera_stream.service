@@ -1,0 +1,15 @@
+[Unit]
+Description=USB Camera Stream Server
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/data
+Environment="PATH=/home/pi/env/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/home/pi/env/bin/python /data/camera_stream.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

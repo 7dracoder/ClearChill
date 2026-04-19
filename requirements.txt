@@ -29,6 +29,9 @@ pydantic==2.10.4
 pydantic-settings==2.7.1
 python-dateutil==2.9.0
 
+# SSH remote management (for run_camera.py - dev machine only)
+paramiko==3.4.0
+
 # Hardware (for Raspberry Pi - optional)
 gpiozero==2.0.1; platform_machine == "armv7l" or platform_machine == "aarch64"
 picamera2==0.3.16; platform_machine == "armv7l" or platform_machine == "aarch64"

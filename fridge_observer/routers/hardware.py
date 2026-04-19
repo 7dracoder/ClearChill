@@ -193,6 +193,153 @@ class ExpiryDateInput(BaseModel):
     expiry_date: str  # ISO format: "2026-04-25"
 
 
+class SessionItem(BaseModel):
+    name: str
+    category: str
+    confidence: float
+    needs_expiry_input: bool
+    expiry_source: Optional[str] = "unknown"   # "label" | "estimated" | "unknown"
+    expiry_date: Optional[str] = None           # ISO date if read from label
+    estimated_expiry_days: Optional[int] = None
+
+
+class SessionComplete(BaseModel):
+    session_id: str
+    started_at: str
+    ended_at: str
+    duration_seconds: int
+    frames_captured: int
+    items_added: List[SessionItem]
+    items_removed: Optional[List[SessionItem]] = []
+    low_confidence_items: Optional[List] = []
+
+
+@router.post("/session-complete")
+async def receive_session_complete(
+    session: SessionComplete,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Receive a completed capture session from the Raspberry Pi.
+    The Pi has already run Gemini inference locally — this endpoint
+    only handles persistence and WebSocket broadcast.
+    No image data is received here.
+    """
+    from datetime import datetime, timedelta
+    from fridge_observer.supabase_client import get_supabase
+    from fridge_observer.ws_manager import manager
+
+    logger.info(
+        "Session %s: %d item(s) detected, %d frame(s), %.1f s",
+        session.session_id,
+        len(session.items_added),
+        session.frames_captured,
+        session.duration_seconds,
+    )
+
+    sb = get_supabase()
+    added_items   = []
+    needs_expiry  = []
+    removed_items = []
+
+    # ── Process items added to fridge ─────────────────────────
+    for item in session.items_added:
+        if item.expiry_source == "label" and item.expiry_date:
+            # Best case: Gemini read the date directly off the label
+            try:
+                sb.table("food_items").insert({
+                    "name":        item.name,
+                    "category":    item.category,
+                    "quantity":    1,
+                    "expiry_date": item.expiry_date,
+                    "user_id":     current_user["sub"],
+                    "added_via":   "hardware_label",
+                }).execute()
+                added_items.append({
+                    "name":        item.name,
+                    "category":    item.category,
+                    "expiry_date": item.expiry_date,
+                    "expiry_source": "label",
+                })
+                logger.info("Auto-added %s (label date: %s)", item.name, item.expiry_date)
+            except Exception as exc:
+                logger.error("Failed to insert %s: %s", item.name, exc)
+
+        elif not item.needs_expiry_input and item.estimated_expiry_days is not None:
+            # Fresh produce — use estimated shelf life
+            expiry_date = datetime.utcnow() + timedelta(days=item.estimated_expiry_days)
+            try:
+                sb.table("food_items").insert({
+                    "name":        item.name,
+                    "category":    item.category,
+                    "quantity":    1,
+                    "expiry_date": expiry_date.date().isoformat(),
+                    "user_id":     current_user["sub"],
+                    "added_via":   "hardware_auto",
+                }).execute()
+                added_items.append({
+                    "name":        item.name,
+                    "category":    item.category,
+                    "expiry_date": expiry_date.date().isoformat(),
+                    "expiry_source": "estimated",
+                    "estimated_days": item.estimated_expiry_days,
+                })
+                logger.info("Auto-added %s (estimated expiry: %s)", item.name, expiry_date.date())
+            except Exception as exc:
+                logger.error("Failed to insert %s: %s", item.name, exc)
+
+        else:
+            # Packaged item, date not visible — queue for user input
+            needs_expiry.append({
+                "name":     item.name,
+                "category": item.category,
+                "confidence": item.confidence,
+            })
+            logger.info("Queued for expiry input: %s", item.name)
+
+    # ── Process items removed from fridge ─────────────────────
+    for item in (session.items_removed or []):
+        try:
+            # Mark as removed in inventory (soft delete — set quantity to 0 or delete)
+            result = sb.table("food_items").select("id").eq(
+                "name", item.name
+            ).eq("user_id", current_user["sub"]).order(
+                "created_at", desc=True
+            ).limit(1).execute()
+
+            if result.data:
+                item_id = result.data[0]["id"]
+                sb.table("food_items").delete().eq("id", item_id).execute()
+                removed_items.append({"name": item.name, "category": item.category})
+                logger.info("Removed %s from inventory", item.name)
+            else:
+                logger.info("Removal: %s not found in inventory (may not have been tracked)", item.name)
+        except Exception as exc:
+            logger.error("Failed to remove %s: %s", item.name, exc)
+
+    # Broadcast real-time update to web UI
+    if added_items or needs_expiry or removed_items:
+        await manager.broadcast({
+            "type":   "inventory_updated",
+            "action": "session_complete",
+            "session_id":         session.session_id,
+            "auto_added":         added_items,
+            "needs_expiry_input": needs_expiry,
+            "removed":            removed_items,
+            "source": "hardware_session",
+        })
+
+    return {
+        "status":                "processed",
+        "session_id":            session.session_id,
+        "pending_items_created": len(needs_expiry),
+        "auto_added":            added_items,
+        "needs_expiry_input":    needs_expiry,
+        "removed":               removed_items,
+        "timestamp":             datetime.utcnow().isoformat() + "Z",
+    }
+
+
 @router.post("/door-event")
 async def receive_door_event(
     event: DoorEvent,
@@ -554,3 +701,85 @@ async def receive_session_complete(
     except Exception as e:
         logger.error(f"Error processing session complete: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/sensor-status")
+async def get_sensor_status():
+    """
+    Get real-time sensor status for monitoring dashboard.
+    This endpoint doesn't require authentication for easy polling.
+    """
+    import subprocess
+    import json
+    
+    try:
+        # Try to read the latest sensor log from Pi
+        result = subprocess.run(
+            ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=2", 
+             "pi@192.168.0.1", "tail -50 ~/fridge-observer/sensor.log 2>/dev/null || echo 'no log'"],
+            capture_output=True,
+            text=True,
+            timeout=3
+        )
+        
+        log_lines = result.stdout.strip().split('\n')
+        
+        # Parse log to extract status
+        door_open = False
+        capturing = False
+        processing = False
+        frame_count = 0
+        light_level = None
+        last_event = None
+        items_detected = 0
+        
+        for line in reversed(log_lines[-20:]):  # Check last 20 lines
+            if "Door OPENED" in line:
+                door_open = True
+                if "darkness:" in line:
+                    try:
+                        light_level = float(line.split("darkness:")[1].split("ms")[0].strip())
+                    except:
+                        pass
+            elif "Door closed" in line or "Door CLOSED" in line:
+                door_open = False
+            elif "Frame" in line and "captured" in line:
+                capturing = True
+                try:
+                    frame_count = int(line.split("Frame")[1].split("captured")[0].strip())
+                except:
+                    pass
+            elif "Running" in line and "inference" in line:
+                processing = True
+                capturing = False
+            elif "detected:" in line:
+                try:
+                    items_detected = int(line.split("detected:")[1].split("added")[0].strip())
+                except:
+                    pass
+        
+        return {
+            "door_open": door_open,
+            "capturing": capturing,
+            "processing": processing,
+            "frame_count": frame_count,
+            "light_level": light_level,
+            "items_detected": items_detected,
+            "last_event": datetime.utcnow().isoformat() + "Z",
+            "ai_model": "Groq Llama 3.2",
+            "status": "online"
+        }
+    
+    except Exception as e:
+        logger.error(f"Error getting sensor status: {e}")
+        return {
+            "door_open": False,
+            "capturing": False,
+            "processing": False,
+            "frame_count": 0,
+            "light_level": None,
+            "items_detected": 0,
+            "last_event": None,
+            "ai_model": "Unknown",
+            "status": "offline"
+        }

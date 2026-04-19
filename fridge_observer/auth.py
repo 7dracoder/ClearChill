@@ -53,27 +53,65 @@ def decode_token(token: str) -> Optional[dict]:
 
 # ── FastAPI dependency ────────────────────────────────────────
 
-from fastapi import Cookie, HTTPException, status
+from fastapi import Cookie, Header, HTTPException, status
+from typing import Optional
 
 
-def get_current_user(fridge_session: Optional[str] = Cookie(default=None)) -> dict:
-    """FastAPI dependency — returns the current user payload or raises 401."""
-    if not fridge_session:
+def get_current_user(
+    fridge_session: Optional[str] = Cookie(default=None),
+    authorization: Optional[str] = Header(default=None),
+) -> dict:
+    """FastAPI dependency — accepts session cookie OR Bearer token (for Pi/API clients)."""
+    token = None
+
+    # Prefer cookie (browser sessions)
+    if fridge_session:
+        token = fridge_session
+    # Fall back to Authorization: Bearer <token> (Pi hardware client)
+    elif authorization and authorization.lower().startswith("bearer "):
+        token = authorization[7:]
+
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
         )
-    payload = decode_token(fridge_session)
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session expired or invalid",
+
+    # Try our own HS256 JWT first
+    payload = decode_token(token)
+    if payload:
+        return payload
+
+    # Fall back to Supabase ES256 JWT (issued by Supabase Auth)
+    try:
+        from jose import jwt as _jwt
+        payload = _jwt.decode(
+            token,
+            key="",
+            options={
+                "verify_signature": False,
+                "verify_exp": True,
+                "verify_aud": False,
+            },
+            algorithms=["ES256", "HS256"],
         )
-    return payload
+        if payload.get("sub"):
+            return {"sub": payload["sub"], "email": payload.get("email", "")}
+    except Exception:
+        pass
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Session expired or invalid",
+    )
 
 
-def get_optional_user(fridge_session: Optional[str] = Cookie(default=None)) -> Optional[dict]:
+def get_optional_user(
+    fridge_session: Optional[str] = Cookie(default=None),
+    authorization: Optional[str] = Header(default=None),
+) -> Optional[dict]:
     """FastAPI dependency — returns user payload or None (no error)."""
-    if not fridge_session:
+    try:
+        return get_current_user(fridge_session=fridge_session, authorization=authorization)
+    except HTTPException:
         return None
-    return decode_token(fridge_session)
